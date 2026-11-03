@@ -1,395 +1,458 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
+import { EXDB, RawExercise } from "@/lib/exercises-data.js";
 
-interface Exercise {
-    id: string;
-    name: string;
-    muscle: string;
-    category: "Chest" | "Back" | "Shoulders" | "Legs" | "Core" | "Arms";
-    equipment: "Barbell" | "Dumbbell" | "Cable" | "Bodyweight" | "Machine";
-    difficulty: "Beginner" | "Intermediate" | "Advanced";
-    primaryLoad: string;
-    cues: string[];
-}
+const PAGE_SIZE = 30;
 
-const EXERCISE_LIBRARY: Exercise[] = [
-    {
-        id: "ex-1",
-        name: "Barbell Flat Bench Press",
-        muscle: "Pectoralis Major, Triceps",
-        category: "Chest",
-        equipment: "Barbell",
-        difficulty: "Intermediate",
-        primaryLoad: "Upper Body Horizontal Push",
-        cues: ["Retract scapula into bench", "Lower bar to lower chest", "Drive heels into ground"],
-    },
-    {
-        id: "ex-2",
-        name: "Incline Dumbbell Press",
-        muscle: "Clavicular Pectoral Head, Anterior Delt",
-        category: "Chest",
-        equipment: "Dumbbell",
-        difficulty: "Intermediate",
-        primaryLoad: "Upper Chest Incline Push",
-        cues: ["Bench angle 30 degrees", "Control the 3-second eccentric", "Avoid clanking dumbbells"],
-    },
-    {
-        id: "ex-3",
-        name: "Weighted Chest Dips",
-        muscle: "Lower Pectorals, Triceps, Core",
-        category: "Chest",
-        equipment: "Bodyweight",
-        difficulty: "Advanced",
-        primaryLoad: "Vertical Bodyweight Push",
-        cues: ["Slight forward torso lean", "Break at elbows to 90 degrees", "Lock out triceps at apex"],
-    },
-    {
-        id: "ex-4",
-        name: "Barbell Bent-Over Row",
-        muscle: "Latissimus Dorsi, Rhomboids, Traps",
-        category: "Back",
-        equipment: "Barbell",
-        difficulty: "Intermediate",
-        primaryLoad: "Horizontal Pull Load",
-        cues: ["Hinge at hips at 45 degrees", "Pull elbows past ribcage", "Maintain neutral spine"],
-    },
-    {
-        id: "ex-5",
-        name: "Weighted Pull-Up",
-        muscle: "Latissimus Dorsi, Biceps, Core",
-        category: "Back",
-        equipment: "Bodyweight",
-        difficulty: "Advanced",
-        primaryLoad: "Vertical Lat Pull",
-        cues: ["Deadhang start position", "Drive elbows downward to ribs", "Chest to bar touch"],
-    },
-    {
-        id: "ex-6",
-        name: "Seated Cable Row",
-        muscle: "Mid-Back, Lower Traps",
-        category: "Back",
-        equipment: "Cable",
-        difficulty: "Beginner",
-        primaryLoad: "Horizontal Cable Tension",
-        cues: ["Keep upright torso", "Squeeze shoulder blades 1 second", "Do not hyperextend spine"],
-    },
-    {
-        id: "ex-7",
-        name: "Overhead Military Press",
-        muscle: "Anterior Deltoids, Lateral Delts, Triceps",
-        category: "Shoulders",
-        equipment: "Barbell",
-        difficulty: "Intermediate",
-        primaryLoad: "Vertical Compound Push",
-        cues: ["Glutes & core locked tight", "Bar path directly vertical", "Head passes under bar"],
-    },
-    {
-        id: "ex-8",
-        name: "Cable Lateral Raises",
-        muscle: "Lateral Deltoids",
-        category: "Shoulders",
-        equipment: "Cable",
-        difficulty: "Beginner",
-        primaryLoad: "Isolated Lateral Tension",
-        cues: ["Cable at wrist height", "Slight elbow bend", "Lead with pinky finger"],
-    },
-    {
-        id: "ex-9",
-        name: "Barbell Back Squat",
-        muscle: "Quadriceps, Glutes, Adductors",
-        category: "Legs",
-        equipment: "Barbell",
-        difficulty: "Advanced",
-        primaryLoad: "Lower Body Compound Hinge",
-        cues: ["Brace diaphragm before descent", "Knees track over second toe", "Break parallel plane"],
-    },
-    {
-        id: "ex-10",
-        name: "Romanian Deadlift (RDL)",
-        muscle: "Hamstrings, Gluteus Maximus, Lower Back",
-        category: "Legs",
-        equipment: "Barbell",
-        difficulty: "Intermediate",
-        primaryLoad: "Posterior Chain Stretch",
-        cues: ["Push hips back towards wall", "Shins stay vertical", "Feel deep hamstring stretch"],
-    },
-    {
-        id: "ex-11",
-        name: "Barbell Hip Thrust",
-        muscle: "Gluteus Maximus",
-        category: "Legs",
-        equipment: "Barbell",
-        difficulty: "Intermediate",
-        primaryLoad: "Horizontal Glute Drive",
-        cues: ["Bench under scapula line", "Full hip extension lockout", "Chin tucked to chest"],
-    },
-    {
-        id: "ex-12",
-        name: "Incline Dumbbell Curl",
-        muscle: "Biceps Brachii Long Head",
-        category: "Arms",
-        equipment: "Dumbbell",
-        difficulty: "Beginner",
-        primaryLoad: "Bicep Stretch Focus",
-        cues: ["Bench set to 45 degrees", "Elbows pinned behind torso", "Full stretch at bottom"],
-    },
-    {
-        id: "ex-13",
-        name: "Triceps Rope Pushdown",
-        muscle: "Lateral & Medial Tricep Heads",
-        category: "Arms",
-        equipment: "Cable",
-        difficulty: "Beginner",
-        primaryLoad: "Tricep Lockout Tension",
-        cues: ["Elbows stationary at sides", "Spread rope apart at bottom", "Control 2-second return"],
-    },
-    {
-        id: "ex-14",
-        name: "Hanging Leg Raises",
-        muscle: "Rectus Abdominis, Hip Flexors",
-        category: "Core",
-        equipment: "Bodyweight",
-        difficulty: "Intermediate",
-        primaryLoad: "Lower Core Tension",
-        cues: ["Do not swing or kick", "Roll pelvis upwards to chest", "Control negative drop"],
-    },
-    {
-        id: "ex-15",
-        name: "Cable Woodchoppers",
-        muscle: "Obliques, Transverse Abdominis",
-        category: "Core",
-        equipment: "Cable",
-        difficulty: "Intermediate",
-        primaryLoad: "Rotational Core Power",
-        cues: ["Rotate from core, not arms", "Pivot rear foot smoothly", "Maintain solid wide base"],
-    },
+// Body Part filter options mapping to openGym `bp` tags
+const BODY_PART_OPTIONS = [
+    { label: "All Anatomy", value: "All" },
+    { label: "Chest", value: "chest" },
+    { label: "Back & Lats", value: "back" },
+    { label: "Shoulders", value: "shoulders" },
+    { label: "Arms", value: "upper arms" },
+    { label: "Forearms", value: "lower arms" },
+    { label: "Abs & Core", value: "waist" },
+    { label: "Upper Legs", value: "upper legs" },
+    { label: "Calves & Shins", value: "lower legs" },
+    { label: "Cardio", value: "cardio" },
+    { label: "Full Body", value: "full body" },
 ];
+
+// Equipment filter options mapping to openGym `eq` tags
+const EQUIPMENT_OPTIONS = [
+    { label: "All Equipment", value: "All" },
+    { label: "Barbell", value: "barbell" },
+    { label: "Dumbbell", value: "dumbbell" },
+    { label: "Cable", value: "cable" },
+    { label: "Bodyweight", value: "body weight" },
+    { label: "Machine", value: "leverage machine" },
+    { label: "Resistance Band", value: "band" },
+    { label: "Kettlebell", value: "kettlebell" },
+    { label: "Smith Machine", value: "smith machine" },
+    { label: "EZ Barbell", value: "ez barbell" },
+];
+
+function titleCase(str: string): string {
+    if (!str) return "";
+    return str
+        .toLowerCase()
+        .split(" ")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+}
 
 export default function ExerciseEnginePage() {
     const [searchQuery, setSearchQuery] = useState("");
-    const [selectedCategory, setSelectedCategory] = useState<string>("All");
-    const [selectedEquipment, setSelectedEquipment] = useState<string>("All");
-    const [activeExerciseModal, setActiveExerciseModal] = useState<Exercise | null>(null);
+    const [selectedBodyPart, setSelectedBodyPart] = useState("All");
+    const [selectedEquipment, setSelectedEquipment] = useState("All");
+    const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+    const [activeModalExercise, setActiveModalExercise] = useState<RawExercise | null>(null);
+    const [copiedName, setCopiedName] = useState(false);
 
-    const categories = ["All", "Chest", "Back", "Shoulders", "Legs", "Arms", "Core"];
-    const equipmentTypes = ["All", "Barbell", "Dumbbell", "Cable", "Bodyweight", "Machine"];
+    // Reset pagination window when filters change
+    useEffect(() => {
+        setVisibleCount(PAGE_SIZE);
+    }, [searchQuery, selectedBodyPart, selectedEquipment]);
 
-    const filteredExercises = EXERCISE_LIBRARY.filter((ex) => {
-        const matchesSearch =
-            ex.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            ex.muscle.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesCategory = selectedCategory === "All" || ex.category === selectedCategory;
-        const matchesEquipment = selectedEquipment === "All" || ex.equipment === selectedEquipment;
-        return matchesSearch && matchesCategory && matchesEquipment;
-    });
+    // Fast In-Memory Filter across all 5,632 openGym exercises
+    const filteredExercises = useMemo(() => {
+        const query = searchQuery.trim().toLowerCase();
+
+        return EXDB.filter((ex) => {
+            // Text Search across Name, Target, and Secondary Muscles
+            if (query) {
+                const matchesName = ex.n.toLowerCase().includes(query);
+                const matchesTarget = ex.tg?.toLowerCase().includes(query);
+                const matchesSecondary = ex.sm?.some((s) => s.toLowerCase().includes(query));
+                if (!matchesName && !matchesTarget && !matchesSecondary) return false;
+            }
+
+            // Body Part Filter
+            if (selectedBodyPart !== "All" && ex.bp !== selectedBodyPart) {
+                return false;
+            }
+
+            // Equipment Filter
+            if (selectedEquipment !== "All" && ex.eq !== selectedEquipment) {
+                return false;
+            }
+
+            return true;
+        });
+    }, [searchQuery, selectedBodyPart, selectedEquipment]);
+
+    // Slice current page batch for snappy rendering
+    const displayedExercises = useMemo(() => {
+        return filteredExercises.slice(0, visibleCount);
+    }, [filteredExercises, visibleCount]);
+
+    const handleLoadMore = () => {
+        setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, filteredExercises.length));
+    };
+
+    const handleCopy = (name: string) => {
+        navigator.clipboard.writeText(titleCase(name));
+        setCopiedName(true);
+        setTimeout(() => setCopiedName(false), 2000);
+    };
 
     return (
-        <div className="min-h-screen bg-[#0e0e10] text-[#f4f4f5] pt-8 sm:pt-10 pb-24 px-4 sm:px-8 font-sans selection:bg-[#00ff87]/30">
-            <div className="max-w-6xl mx-auto space-y-6">
-                {/* Navigation & Header */}
+        <div className="min-h-screen bg-[#0e0e10] text-[#f4f4f5] pt-8 sm:pt-10 pb-28 px-4 sm:px-8 font-sans selection:bg-[#00ff87]/30">
+            <div className="max-w-7xl mx-auto space-y-6">
+                {/* Header & Quick Navigation */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800/80 pb-5">
                     <div>
                         <Link
                             href="/portal"
-                            className="text-xs text-zinc-400 hover:text-white transition-colors flex items-center gap-1.5 mb-2"
+                            className="text-xs text-zinc-400 hover:text-white transition-colors flex items-center gap-1.5 mb-2 font-medium"
                         >
-                            ← Back to Athlete Hub
+                            <span>←</span> Back to Athlete Hub
                         </Link>
                         <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
                             5,600+ <span className="text-[#00ff87]">EXERCISE ENGINE</span>
                         </h1>
-                        <p className="text-xs text-zinc-400 mt-1">
-                            Filter by anatomical muscle groups, equipment type, and mechanical load vectors.
+                        <p className="text-xs text-zinc-400 mt-1 max-w-2xl">
+                            Complete openGym exercise catalog with high-precision anatomy tags, verified equipment classifications,
+                            and live frame-by-frame illustration and animation streaming.
                         </p>
                     </div>
 
                     <div className="flex items-center gap-3">
                         <Link
                             href="/portal/stats"
-                            className="bg-[#141518] hover:bg-[#1b1c20] border border-zinc-800 rounded-xl px-4 py-2.5 text-xs font-semibold text-zinc-300 transition-all flex items-center gap-2"
+                            className="bg-[#141518] hover:bg-[#1b1c20] border border-zinc-800 rounded-xl px-4 py-2 text-xs font-semibold text-zinc-300 transition-all flex items-center gap-2 shadow-sm"
                         >
                             <span>🧬</span> View Muscle Heatmap
                         </Link>
+                        <div className="bg-[#141518] border border-zinc-800 rounded-xl px-4 py-2 text-right shadow-sm">
+                            <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider block">
+                                In Library
+                            </span>
+                            <span className="text-base font-black text-[#00ff87] font-mono">
+                                5,632 Movements
+                            </span>
+                        </div>
                     </div>
                 </div>
 
-                {/* Filter Toolbar */}
+                {/* Filter & Search Control Panel */}
                 <div className="bg-[#141518] border border-zinc-800/80 rounded-2xl p-5 space-y-4 shadow-xl">
-                    {/* Search bar */}
+                    {/* Search Bar */}
                     <div className="relative">
                         <span className="absolute left-3.5 top-3 text-zinc-500 text-sm">🔍</span>
                         <input
                             type="text"
-                            placeholder="Search exercise by name or target muscle (e.g. Bench, Lat, Quads)..."
+                            placeholder="Search 5,632 exercises by name or muscle (e.g. Bench, Romanian Deadlift, Lat Pulldown, Biceps)..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-[#1b1c20] border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#00ff87]"
+                            className="w-full bg-[#1b1c20] border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#00ff87] transition-colors"
                         />
+                        {searchQuery && (
+                            <button
+                                onClick={() => setSearchQuery("")}
+                                className="absolute right-3.5 top-2.5 text-zinc-500 hover:text-white text-xs"
+                            >
+                                Clear
+                            </button>
+                        )}
                     </div>
 
-                    {/* Muscle Category Chips */}
-                    <div className="space-y-1.5">
-                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
-                            Muscle Group
-                        </span>
-                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                            {categories.map((cat) => (
+                    {/* Filter Pill Rows */}
+                    <div className="space-y-3 pt-1">
+                        {/* Body Part Filter */}
+                        <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:thin] [scrollbar-color:#3f3f46_#141518]">
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 flex-shrink-0 mr-1">
+                                Muscle:
+                            </span>
+                            {BODY_PART_OPTIONS.map((bp) => (
                                 <button
-                                    key={cat}
-                                    onClick={() => setSelectedCategory(cat)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${selectedCategory === cat
-                                            ? "bg-[#00ff87] text-black border-[#00ff87] shadow-md shadow-[#00ff87]/20"
+                                    key={bp.value}
+                                    onClick={() => setSelectedBodyPart(bp.value)}
+                                    className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-all border whitespace-nowrap flex-shrink-0 ${
+                                        selectedBodyPart === bp.value
+                                            ? "bg-[#00ff87] text-black border-[#00ff87] font-bold shadow-sm shadow-[#00ff87]/20"
                                             : "bg-[#1b1c20] text-zinc-400 border-zinc-800 hover:text-white"
-                                        }`}
+                                    }`}
                                 >
-                                    {cat}
+                                    {bp.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Equipment Filter */}
+                        <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:thin] [scrollbar-color:#3f3f46_#141518]">
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 flex-shrink-0 mr-1">
+                                Gear:
+                            </span>
+                            {EQUIPMENT_OPTIONS.map((eq) => (
+                                <button
+                                    key={eq.value}
+                                    onClick={() => setSelectedEquipment(eq.value)}
+                                    className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-all border whitespace-nowrap flex-shrink-0 ${
+                                        selectedEquipment === eq.value
+                                            ? "bg-zinc-200 text-black border-zinc-200 font-bold"
+                                            : "bg-[#1b1c20] text-zinc-400 border-zinc-800 hover:text-white"
+                                    }`}
+                                >
+                                    {eq.label}
                                 </button>
                             ))}
                         </div>
                     </div>
 
-                    {/* Equipment Type Chips */}
-                    <div className="space-y-1.5">
-                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
-                            Equipment Load
+                    {/* Active Count & Reset Indicator */}
+                    <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-2 border-t border-zinc-800/80">
+                        <span>
+                            Showing <span className="text-[#00ff87] font-mono font-bold">{displayedExercises.length}</span> of{" "}
+                            <span className="text-white font-mono font-bold">{filteredExercises.length.toLocaleString()}</span> filtered exercises
                         </span>
-                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                            {equipmentTypes.map((eq) => (
-                                <button
-                                    key={eq}
-                                    onClick={() => setSelectedEquipment(eq)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${selectedEquipment === eq
-                                            ? "bg-zinc-700 text-white border-zinc-600"
-                                            : "bg-[#1b1c20] text-zinc-400 border-zinc-800 hover:text-white"
-                                        }`}
-                                >
-                                    {eq}
-                                </button>
-                            ))}
-                        </div>
+                        {(searchQuery || selectedBodyPart !== "All" || selectedEquipment !== "All") && (
+                            <button
+                                onClick={() => {
+                                    setSearchQuery("");
+                                    setSelectedBodyPart("All");
+                                    setSelectedEquipment("All");
+                                }}
+                                className="text-zinc-500 hover:text-[#00ff87] transition-colors underline"
+                            >
+                                Reset all filters
+                            </button>
+                        )}
                     </div>
                 </div>
 
                 {/* Exercises Grid */}
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between text-xs text-zinc-400 px-1">
-                        <span>Showing {filteredExercises.length} cataloged exercises</span>
-                        <span className="font-mono text-[11px]">Database v2.4 • openGym Engine</span>
+                {displayedExercises.length === 0 ? (
+                    <div className="bg-[#141518] border border-zinc-800/80 rounded-2xl p-12 text-center space-y-3">
+                        <span className="text-3xl block">🔍</span>
+                        <h3 className="text-base font-bold text-white">No exercises found</h3>
+                        <p className="text-xs text-zinc-500 max-w-sm mx-auto">
+                            No movements matched &quot;{searchQuery}&quot; with your selected equipment and body part filters.
+                        </p>
+                        <button
+                            onClick={() => {
+                                setSearchQuery("");
+                                setSelectedBodyPart("All");
+                                setSelectedEquipment("All");
+                            }}
+                            className="bg-[#1b1c20] hover:bg-zinc-800 text-[#00ff87] border border-zinc-800 px-4 py-2 rounded-xl text-xs font-semibold transition-all"
+                        >
+                            Clear Filters
+                        </button>
                     </div>
-
+                ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {filteredExercises.map((ex) => (
+                        {displayedExercises.map((ex) => (
                             <div
                                 key={ex.id}
-                                onClick={() => setActiveExerciseModal(ex)}
-                                className="bg-[#141518] border border-zinc-800/80 hover:border-[#00ff87]/50 rounded-2xl p-5 flex flex-col justify-between transition-all cursor-pointer group shadow-lg"
+                                onClick={() => setActiveModalExercise(ex)}
+                                className="bg-[#141518] border border-zinc-800/80 rounded-2xl p-4 flex flex-col justify-between hover:border-[#00ff87]/50 hover:bg-[#18191d] transition-all cursor-pointer group shadow-lg"
                             >
-                                <div className="space-y-2.5">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#1b1c20] border border-zinc-800 text-[#00ff87]">
-                                            {ex.category}
-                                        </span>
-                                        <span className="text-[10px] font-mono text-zinc-500">
-                                            {ex.equipment}
+                                <div className="space-y-3">
+                                    {/* Top Meta Badges & Thumbnail */}
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#1b1c20] text-zinc-400 border border-zinc-800">
+                                                {ex.bp}
+                                            </span>
+                                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-zinc-800/80 text-zinc-300">
+                                                {ex.eq}
+                                            </span>
+                                        </div>
+
+                                        <span className="text-[10px] font-mono text-zinc-600 block">
+                                            #{ex.id}
                                         </span>
                                     </div>
 
-                                    <h3 className="text-base font-bold text-white group-hover:text-[#00ff87] transition-colors line-clamp-1">
-                                        {ex.name}
-                                    </h3>
+                                    {/* Exercise Still Illustration Thumbnail */}
+                                    <div className="w-full h-36 bg-[#0c0d0f] rounded-xl border border-zinc-800/80 flex items-center justify-center p-2 overflow-hidden relative">
+                                        {ex.img ? (
+                                            <img
+                                                src={`/api/media/still/${ex.img}`}
+                                                alt={ex.n}
+                                                loading="lazy"
+                                                className="w-full h-full object-contain filter invert contrast-125 transition-transform duration-300 group-hover:scale-105"
+                                            />
+                                        ) : (
+                                            <span className="text-zinc-600 text-xs">No preview</span>
+                                        )}
+                                        <span className="absolute bottom-2 right-2 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-black/60 text-zinc-400 backdrop-blur-sm border border-zinc-800">
+                                            {ex.cat || "Movement"}
+                                        </span>
+                                    </div>
 
-                                    <p className="text-xs text-zinc-400 line-clamp-1">
-                                        🎯 {ex.muscle}
-                                    </p>
+                                    {/* Name & Target Muscles */}
+                                    <div>
+                                        <h3 className="text-sm font-bold text-white group-hover:text-[#00ff87] transition-colors line-clamp-1">
+                                            {titleCase(ex.n)}
+                                        </h3>
+                                        <p className="text-xs text-zinc-400 mt-1 line-clamp-1">
+                                            <span className="text-[#00ff87] font-semibold">Target:</span> {titleCase(ex.tg)}
+                                            {ex.sm && ex.sm.length > 0 && ` • ${ex.sm.slice(0, 2).map(titleCase).join(", ")}`}
+                                        </p>
+                                    </div>
                                 </div>
 
-                                <div className="pt-4 mt-4 border-t border-zinc-800/80 flex items-center justify-between text-xs">
-                                    <span
-                                        className={`font-semibold text-[10px] uppercase ${ex.difficulty === "Advanced"
-                                                ? "text-red-400"
-                                                : ex.difficulty === "Intermediate"
-                                                    ? "text-amber-400"
-                                                    : "text-[#00ff87]"
-                                            }`}
-                                    >
-                                        {ex.difficulty}
+                                {/* Card Footer CTA */}
+                                <div className="pt-3 mt-3 border-t border-zinc-800/80 flex items-center justify-between text-xs">
+                                    <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">
+                                        Form & Video
                                     </span>
-                                    <span className="text-[#00ff87] font-semibold text-xs group-hover:translate-x-0.5 transition-transform">
-                                        View Execution Cues →
+                                    <span className="text-[#00ff87] text-xs font-semibold group-hover:translate-x-1 transition-transform flex items-center gap-1">
+                                        Inspect Cues →
                                     </span>
                                 </div>
                             </div>
                         ))}
                     </div>
-                </div>
+                )}
+
+                {/* Pagination / Load More Controller */}
+                {displayedExercises.length < filteredExercises.length && (
+                    <div className="pt-6 flex flex-col items-center justify-center space-y-2">
+                        <button
+                            onClick={handleLoadMore}
+                            className="bg-[#141518] hover:bg-[#1b1c20] text-[#00ff87] border border-zinc-800 hover:border-[#00ff87]/50 px-8 py-3 rounded-xl font-bold text-xs tracking-wider transition-all shadow-xl hover:shadow-[#00ff87]/10 flex items-center gap-2"
+                        >
+                            <span>Load More Movements</span>
+                            <span className="font-mono text-zinc-400">
+                                (+{Math.min(PAGE_SIZE, filteredExercises.length - displayedExercises.length)})
+                            </span>
+                        </button>
+                        <span className="text-[10px] text-zinc-500 font-mono">
+                            {filteredExercises.length - displayedExercises.length} additional exercises available in filter
+                        </span>
+                    </div>
+                )}
             </div>
 
-            {/* Exercise Details Modal */}
-            {activeExerciseModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                    <div className="bg-[#141518] border border-zinc-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-5">
-                        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+            {/* Exercise Details & Movement Video Modal */}
+            {activeModalExercise && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-200"
+                    onClick={() => setActiveModalExercise(null)}
+                >
+                    <div
+                        className="bg-[#141518] border border-zinc-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#3f3f46_#141518]"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Modal Header */}
+                        <div className="flex items-start justify-between border-b border-zinc-800 pb-3 gap-3">
                             <div>
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-[#00ff87] block">
-                                    {activeExerciseModal.category} • {activeExerciseModal.equipment}
-                                </span>
-                                <h3 className="text-lg font-bold text-white mt-0.5">
-                                    {activeExerciseModal.name}
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#1b1c20] text-zinc-400 border border-zinc-800">
+                                        {activeModalExercise.bp}
+                                    </span>
+                                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#00ff87]/10 text-[#00ff87] border border-[#00ff87]/30">
+                                        {activeModalExercise.eq}
+                                    </span>
+                                </div>
+                                <h3 className="text-lg font-black text-white">
+                                    {titleCase(activeModalExercise.n)}
                                 </h3>
                             </div>
                             <button
-                                onClick={() => setActiveExerciseModal(null)}
-                                className="text-zinc-500 hover:text-white text-base px-2 py-1"
+                                onClick={() => setActiveModalExercise(null)}
+                                className="text-zinc-500 hover:text-white text-lg px-2 py-1 transition-colors"
                             >
                                 ✕
                             </button>
                         </div>
 
-                        <div className="space-y-4 text-xs">
-                            <div className="bg-[#1b1c20] p-3.5 rounded-xl border border-zinc-800 space-y-1">
-                                <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider block">
-                                    Target Anatomical Region
-                                </span>
-                                <span className="font-semibold text-zinc-200">
-                                    {activeExerciseModal.muscle}
-                                </span>
+                        {/* Looping 3-Second Movement Video / Animation */}
+                        <div className="w-full h-64 bg-[#0a0a0c] rounded-xl border border-zinc-800/90 overflow-hidden flex items-center justify-center relative shadow-inner">
+                            {activeModalExercise.gif ? (
+                                <video
+                                    src={`/api/media/clip/${activeModalExercise.gif}`}
+                                    poster={activeModalExercise.img ? `/api/media/still/${activeModalExercise.img}` : undefined}
+                                    autoPlay
+                                    loop
+                                    muted
+                                    playsInline
+                                    className="w-full h-full object-contain filter invert contrast-125"
+                                />
+                            ) : activeModalExercise.img ? (
+                                <img
+                                    src={`/api/media/still/${activeModalExercise.img}`}
+                                    alt={activeModalExercise.n}
+                                    className="w-full h-full object-contain filter invert contrast-125"
+                                />
+                            ) : (
+                                <span className="text-zinc-500 text-xs">No media available</span>
+                            )}
+
+                            <span className="absolute bottom-2.5 left-2.5 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-black/70 text-zinc-300 backdrop-blur-sm border border-zinc-800 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#00ff87] animate-pulse" />
+                                Looping Vector Execution
+                            </span>
+                        </div>
+
+                        {/* Anatomical Stimulus Metrics */}
+                        <div className="space-y-3 text-xs">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="bg-[#1b1c20] p-3 rounded-xl border border-zinc-800 space-y-0.5">
+                                    <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider block">
+                                        Primary Stimulus
+                                    </span>
+                                    <span className="font-bold text-[#00ff87] text-sm">
+                                        {titleCase(activeModalExercise.tg)}
+                                    </span>
+                                </div>
+
+                                <div className="bg-[#1b1c20] p-3 rounded-xl border border-zinc-800 space-y-0.5">
+                                    <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider block">
+                                        Category
+                                    </span>
+                                    <span className="font-bold text-zinc-200 text-sm">
+                                        {titleCase(activeModalExercise.cat || "Strength")}
+                                    </span>
+                                </div>
                             </div>
 
-                            <div className="bg-[#1b1c20] p-3.5 rounded-xl border border-zinc-800 space-y-1">
-                                <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider block">
-                                    Mechanical Profile
-                                </span>
-                                <span className="font-semibold text-zinc-200">
-                                    {activeExerciseModal.primaryLoad}
-                                </span>
-                            </div>
+                            {activeModalExercise.sm && activeModalExercise.sm.length > 0 && (
+                                <div className="bg-[#1b1c20] p-3.5 rounded-xl border border-zinc-800 space-y-1">
+                                    <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider block">
+                                        Synergists & Supporting Muscles
+                                    </span>
+                                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                        {activeModalExercise.sm.map((muscle, i) => (
+                                            <span
+                                                key={i}
+                                                className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 text-[11px] font-medium"
+                                            >
+                                                {titleCase(muscle)}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
-                            <div className="space-y-2">
-                                <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider block">
-                                    Form & Execution Cues
-                                </span>
-                                <ul className="space-y-1.5">
-                                    {activeExerciseModal.cues.map((cue, idx) => (
-                                        <li
-                                            key={idx}
-                                            className="flex items-start gap-2 bg-[#18191d] p-2.5 rounded-lg border border-zinc-800/80 text-zinc-300"
-                                        >
-                                            <span className="text-[#00ff87] font-bold">✓</span>
-                                            <span>{cue}</span>
-                                        </li>
-                                    ))}
-                                </ul>
+                            {/* Technical Details */}
+                            <div className="bg-[#18191d] p-3 rounded-xl border border-zinc-800/80 flex items-center justify-between text-[11px]">
+                                <span className="text-zinc-500 font-mono">Catalog Permanent ID</span>
+                                <span className="font-mono text-zinc-300">#{activeModalExercise.id}</span>
                             </div>
                         </div>
 
-                        <div className="pt-3 border-t border-zinc-800 flex justify-end">
+                        {/* Modal Action Buttons */}
+                        <div className="pt-3 border-t border-zinc-800 flex items-center justify-between gap-3">
                             <button
-                                onClick={() => setActiveExerciseModal(null)}
-                                className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold transition-colors"
+                                onClick={() => handleCopy(activeModalExercise.n)}
+                                className="px-3.5 py-2 rounded-xl bg-[#1b1c20] hover:bg-zinc-800 text-zinc-300 text-xs font-semibold border border-zinc-800 transition-colors flex items-center gap-1.5"
                             >
-                                Close
+                                <span>📋</span>
+                                <span>{copiedName ? "Copied!" : "Copy Movement Name"}</span>
+                            </button>
+
+                            <button
+                                onClick={() => setActiveModalExercise(null)}
+                                className="px-5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-semibold transition-colors"
+                            >
+                                Done
                             </button>
                         </div>
                     </div>
