@@ -20,6 +20,7 @@ interface WorkoutLog {
     split: string;
     durationMinutes: number;
     totalVolumeKg: number;
+    status?: "Completed" | "In-Progress";
     exercises: {
         name: string;
         sets: number;
@@ -42,6 +43,7 @@ const INITIAL_LOGS: WorkoutLog[] = [
         split: "Push Day",
         durationMinutes: 60,
         totalVolumeKg: 2400,
+        status: "Completed",
         exercises: [
             {
                 name: "Barbell Flat Bench Press",
@@ -64,6 +66,7 @@ const INITIAL_LOGS: WorkoutLog[] = [
         split: "Push Day",
         durationMinutes: 65,
         totalVolumeKg: 4850,
+        status: "Completed",
         exercises: [
             {
                 name: "Barbell Flat Bench Press",
@@ -113,64 +116,6 @@ const INITIAL_LOGS: WorkoutLog[] = [
                     { setNumber: 1, reps: 12, weightKg: 30, completed: true },
                     { setNumber: 2, reps: 12, weightKg: 30, completed: true },
                     { setNumber: 3, reps: 12, weightKg: 30, completed: true },
-                ],
-            },
-        ],
-    },
-    {
-        id: "log-3",
-        date: "2026-10-31",
-        split: "Pull Day",
-        durationMinutes: 70,
-        totalVolumeKg: 5400,
-        exercises: [
-            {
-                name: "Barbell Bent-Over Row",
-                sets: 4,
-                reps: 8,
-                weightKg: 75,
-                completedSetsCount: 4,
-                setDetails: [
-                    { setNumber: 1, reps: 8, weightKg: 75, completed: true },
-                    { setNumber: 2, reps: 8, weightKg: 75, completed: true },
-                    { setNumber: 3, reps: 8, weightKg: 75, completed: true },
-                    { setNumber: 4, reps: 8, weightKg: 75, completed: true },
-                ],
-            },
-            {
-                name: "Weighted Pull-Up",
-                sets: 3,
-                reps: 6,
-                weightKg: 15,
-                completedSetsCount: 2,
-                setDetails: [
-                    { setNumber: 1, reps: 6, weightKg: 15, completed: true },
-                    { setNumber: 2, reps: 6, weightKg: 15, completed: true },
-                    { setNumber: 3, reps: 6, weightKg: 15, completed: false },
-                ],
-            },
-            {
-                name: "Seated Cable Row",
-                sets: 3,
-                reps: 12,
-                weightKg: 55,
-                completedSetsCount: 3,
-                setDetails: [
-                    { setNumber: 1, reps: 12, weightKg: 55, completed: true },
-                    { setNumber: 2, reps: 12, weightKg: 55, completed: true },
-                    { setNumber: 3, reps: 12, weightKg: 55, completed: true },
-                ],
-            },
-            {
-                name: "Incline Dumbbell Curl",
-                sets: 3,
-                reps: 12,
-                weightKg: 14,
-                completedSetsCount: 3,
-                setDetails: [
-                    { setNumber: 1, reps: 12, weightKg: 14, completed: true },
-                    { setNumber: 2, reps: 12, weightKg: 14, completed: true },
-                    { setNumber: 3, reps: 12, weightKg: 14, completed: true },
                 ],
             },
         ],
@@ -293,7 +238,8 @@ export default function WorkoutHistoryPage() {
         }
     };
 
-    const finishAndSaveLiveWorkout = () => {
+    // Helper to construct log payload
+    const buildCurrentSessionPayload = (isFinalComplete: boolean): WorkoutLog => {
         const today = new Date().toISOString().split("T")[0];
         const durationMins = Math.max(1, Math.round(elapsedSeconds / 60));
 
@@ -314,15 +260,20 @@ export default function WorkoutHistoryPage() {
 
         if (totalVol === 0) totalVol = 1800;
 
-        const newLog: WorkoutLog = {
+        return {
             id: `log-${Date.now()}`,
             date: today,
             split: activeSplit,
             durationMinutes: durationMins,
             totalVolumeKg: totalVol,
+            status: isFinalComplete ? "Completed" : "In-Progress",
             exercises: finalExercises,
         };
+    };
 
+    // 1. Save Progress & Draft Option
+    const handleSaveDraft = () => {
+        const newLog = buildCurrentSessionPayload(false);
         const updated = [newLog, ...logs];
         setLogs(updated);
         localStorage.setItem("ironcore_workout_history", JSON.stringify(updated));
@@ -331,6 +282,21 @@ export default function WorkoutHistoryPage() {
         setIsPaused(false);
         setElapsedSeconds(0);
         setIsResting(false);
+        alert("💾 Workout progress saved as draft! You can resume it anytime from past sessions.");
+    };
+
+    // 2. Complete & Final Save Option
+    const handleFinishAndSaveFinal = () => {
+        const newLog = buildCurrentSessionPayload(true);
+        const updated = [newLog, ...logs];
+        setLogs(updated);
+        localStorage.setItem("ironcore_workout_history", JSON.stringify(updated));
+
+        setIsLiveActive(false);
+        setIsPaused(false);
+        setElapsedSeconds(0);
+        setIsResting(false);
+        alert(`🎉 Workout Completed! Logged ${newLog.durationMinutes}m and ${(newLog.totalVolumeKg / 1000).toFixed(1)}k kg volume.`);
     };
 
     const cancelLiveWorkout = () => {
@@ -342,7 +308,38 @@ export default function WorkoutHistoryPage() {
         }
     };
 
-    // Resume a past session into the live tracker
+    // Delete Individual Set Function
+    const deleteSetFromExercise = (exId: string, setNumber: number) => {
+        setActiveExercises((prev) =>
+            prev.map((ex) => {
+                if (ex.id !== exId) return ex;
+                if (ex.sets.length <= 1) {
+                    alert("At least one set must remain. You can remove the exercise instead.");
+                    return ex;
+                }
+                const filtered = ex.sets.filter((s) => s.setNumber !== setNumber);
+                // Re-index set numbers
+                const reindexed = filtered.map((s, idx) => ({
+                    ...s,
+                    setNumber: idx + 1,
+                }));
+                return {
+                    ...ex,
+                    sets: reindexed,
+                };
+            })
+        );
+    };
+
+    // Remove entire exercise from active workout
+    const removeExerciseFromActive = (exId: string) => {
+        if (activeExercises.length <= 1) {
+            alert("At least one exercise is required in the session.");
+            return;
+        }
+        setActiveExercises((prev) => prev.filter((ex) => ex.id !== exId));
+    };
+
     const resumePastSession = (session: WorkoutLog) => {
         setActiveSplit(session.split);
         setElapsedSeconds(session.durationMinutes * 60);
@@ -355,7 +352,6 @@ export default function WorkoutHistoryPage() {
                     sets: ex.setDetails,
                 };
             }
-            // Fallback if setDetails missing
             const setsArr = [];
             const totalCount = ex.sets || 3;
             const completedCount = ex.completedSetsCount ?? totalCount;
@@ -379,8 +375,6 @@ export default function WorkoutHistoryPage() {
         setIsResting(false);
         setIsLiveActive(true);
         setInspectedSession(null);
-
-        // Scroll smoothly to top
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
@@ -462,6 +456,7 @@ export default function WorkoutHistoryPage() {
             split: manualSplit,
             durationMinutes: manualDuration,
             totalVolumeKg: manualSets * manualReps * manualWeight,
+            status: "Completed",
             exercises: [
                 {
                     name: manualExercise,
@@ -480,7 +475,6 @@ export default function WorkoutHistoryPage() {
 
     if (!isMounted) return null;
 
-    // Circular progress calculations
     const radius = 90;
     const circumference = 2 * Math.PI * radius;
     const progressRatio = isResting
@@ -507,7 +501,7 @@ export default function WorkoutHistoryPage() {
                             WORKOUT <span className="text-[#00ff87]">HISTORY & SESSIONS</span>
                         </h1>
                         <p className="text-xs text-zinc-400 mt-1">
-                            Click any workout card below to inspect completed sets, volume details, or resume training.
+                            Mobile circular stopwatch, live set logger, progressive overload tracking, and performance export.
                         </p>
                     </div>
 
@@ -556,6 +550,7 @@ export default function WorkoutHistoryPage() {
                             </span>
                         </div>
 
+                        {/* Circular Gauge Ring */}
                         <div className="relative w-64 h-64 flex items-center justify-center select-none">
                             <svg className="w-full h-full transform -rotate-90" viewBox="0 0 200 200">
                                 <circle cx="100" cy="100" r={radius} stroke="#1c1e24" strokeWidth="12" fill="transparent" />
@@ -583,6 +578,7 @@ export default function WorkoutHistoryPage() {
                             </div>
                         </div>
 
+                        {/* Timer Center Controls */}
                         <div className="flex items-center gap-4">
                             <button
                                 onClick={resetCurrentTimer}
@@ -602,11 +598,30 @@ export default function WorkoutHistoryPage() {
                             </button>
 
                             <button
-                                onClick={finishAndSaveLiveWorkout}
-                                className="w-14 h-14 rounded-2xl bg-[#1b1d24] hover:bg-[#252833] text-zinc-300 border border-zinc-700/80 flex items-center justify-center text-base transition-all shadow-md active:scale-95"
-                                title="Finish and save workout"
+                                onClick={cancelLiveWorkout}
+                                className="w-14 h-14 rounded-2xl bg-[#1b1d24] hover:bg-red-500/20 text-red-400 border border-zinc-700/80 flex items-center justify-center text-base transition-all shadow-md active:scale-95"
+                                title="Discard workout"
                             >
-                                ⏹
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* 2 DISTINCT FINISH & SAVE BUTTONS */}
+                        <div className="w-full flex flex-col sm:flex-row items-center gap-3 pt-2">
+                            <button
+                                onClick={handleSaveDraft}
+                                className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-[#1c1e24] hover:bg-[#262932] text-zinc-200 border border-zinc-700/90 text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md active:scale-[0.98]"
+                            >
+                                <span>💾</span>
+                                <span>Save Progress as Draft</span>
+                            </button>
+
+                            <button
+                                onClick={handleFinishAndSaveFinal}
+                                className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-[#00ff87] hover:bg-[#00e57a] text-black text-xs font-black transition-all shadow-lg shadow-[#00ff87]/25 flex items-center justify-center gap-2 active:scale-[0.98]"
+                            >
+                                <span>✓</span>
+                                <span>Complete & Log Final Session</span>
                             </button>
                         </div>
 
@@ -616,9 +631,7 @@ export default function WorkoutHistoryPage() {
                                 <span className="text-xs font-bold text-white uppercase tracking-wider">
                                     Session Movements & Sets
                                 </span>
-                                <button onClick={cancelLiveWorkout} className="text-xs text-red-400 hover:underline">
-                                    Discard Workout
-                                </button>
+                                <span className="text-[11px] text-zinc-500 font-mono">Click ✕ to delete accidental sets</span>
                             </div>
 
                             <div className="space-y-3">
@@ -628,12 +641,21 @@ export default function WorkoutHistoryPage() {
                                             <h4 className="text-xs font-bold text-white flex items-center gap-2">
                                                 <span className="text-[#00ff87]">🏋️</span> {ex.name}
                                             </h4>
-                                            <button
-                                                onClick={() => addSetToExercise(ex.id)}
-                                                className="text-[11px] font-bold text-[#00ff87] hover:underline"
-                                            >
-                                                + Add Set
-                                            </button>
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    onClick={() => addSetToExercise(ex.id)}
+                                                    className="text-[11px] font-bold text-[#00ff87] hover:underline"
+                                                >
+                                                    + Add Set
+                                                </button>
+                                                <button
+                                                    onClick={() => removeExerciseFromActive(ex.id)}
+                                                    className="text-[11px] font-bold text-zinc-500 hover:text-red-400"
+                                                    title="Remove exercise"
+                                                >
+                                                    Remove
+                                                </button>
+                                            </div>
                                         </div>
 
                                         <div className="space-y-1.5">
@@ -651,15 +673,26 @@ export default function WorkoutHistoryPage() {
                                                         <span>× {set.reps} reps</span>
                                                     </div>
 
-                                                    <button
-                                                        onClick={() => toggleSetComplete(ex.id, set.setNumber)}
-                                                        className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all ${set.completed
-                                                                ? "bg-[#00ff87] text-black"
-                                                                : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
-                                                            }`}
-                                                    >
-                                                        {set.completed ? "✓ Done" : "Mark Set"}
-                                                    </button>
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={() => toggleSetComplete(ex.id, set.setNumber)}
+                                                            className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all ${set.completed
+                                                                    ? "bg-[#00ff87] text-black"
+                                                                    : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+                                                                }`}
+                                                        >
+                                                            {set.completed ? "✓ Done" : "Mark Set"}
+                                                        </button>
+
+                                                        {/* DELETE INDIVIDUAL SET BUTTON */}
+                                                        <button
+                                                            onClick={() => deleteSetFromExercise(ex.id, set.setNumber)}
+                                                            className="w-7 h-7 rounded-md bg-zinc-800/80 hover:bg-red-500/20 text-zinc-400 hover:text-red-400 flex items-center justify-center transition-colors text-xs font-bold"
+                                                            title={`Delete Set ${set.setNumber}`}
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
@@ -726,9 +759,7 @@ export default function WorkoutHistoryPage() {
                     </div>
                 </div>
 
-                {/* ========================================================================= */}
-                {/* PAST SESSIONS LIST (NOW FULLY CLICKABLE WITH HOVER FEEDBACK)              */}
-                {/* ========================================================================= */}
+                {/* Past Sessions List */}
                 <div className="space-y-4">
                     <div className="flex items-center justify-between text-xs text-zinc-400 px-1">
                         <h3 className="text-sm font-bold text-white print:text-black uppercase tracking-wider">
@@ -751,6 +782,11 @@ export default function WorkoutHistoryPage() {
                                         <span className="px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider bg-[#00ff87]/10 text-[#00ff87] border border-[#00ff87]/30 group-hover:bg-[#00ff87] group-hover:text-black transition-colors">
                                             {log.split}
                                         </span>
+                                        {log.status === "In-Progress" && (
+                                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                                Draft / Incomplete
+                                            </span>
+                                        )}
                                         <span className="text-xs font-mono text-zinc-400 print:text-zinc-600 font-bold">
                                             {log.date}
                                         </span>
@@ -799,9 +835,7 @@ export default function WorkoutHistoryPage() {
                 </div>
             </div>
 
-            {/* ========================================================================= */}
-            {/* SESSION INSPECT & RESUME MODAL                                           */}
-            {/* ========================================================================= */}
+            {/* Session Inspection Modal */}
             {inspectedSession && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 print:hidden animate-in fade-in duration-150">
                     <div className="bg-[#141518] border border-zinc-800 rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-5">
@@ -820,7 +854,6 @@ export default function WorkoutHistoryPage() {
                             </button>
                         </div>
 
-                        {/* Quick Metrics */}
                         <div className="grid grid-cols-3 gap-2 text-center">
                             <div className="bg-[#1b1c20] p-3 rounded-xl border border-zinc-800/80">
                                 <span className="text-[10px] text-zinc-400 uppercase font-semibold block">Duration</span>
@@ -836,7 +869,6 @@ export default function WorkoutHistoryPage() {
                             </div>
                         </div>
 
-                        {/* Exercise & Set Breakdown */}
                         <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
                             <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">
                                 Exercise Set Breakdown
@@ -853,7 +885,6 @@ export default function WorkoutHistoryPage() {
                                         </span>
                                     </div>
 
-                                    {/* Set completion indicator */}
                                     <div className="flex items-center gap-1.5 flex-wrap pt-1">
                                         {Array.from({ length: ex.sets }).map((_, sIdx) => {
                                             const isDone = sIdx < (ex.completedSetsCount ?? ex.sets);
@@ -874,7 +905,6 @@ export default function WorkoutHistoryPage() {
                             ))}
                         </div>
 
-                        {/* Modal Bottom Actions */}
                         <div className="pt-3 border-t border-zinc-800 flex items-center justify-between gap-3">
                             <button
                                 onClick={() => deletePastLog(inspectedSession.id)}
