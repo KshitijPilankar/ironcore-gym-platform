@@ -25,6 +25,13 @@ interface WorkoutLog {
         sets: number;
         reps: number;
         weightKg: number;
+        completedSetsCount?: number;
+        setDetails?: {
+            setNumber: number;
+            reps: number;
+            weightKg: number;
+            completed: boolean;
+        }[];
     }[];
 }
 
@@ -36,7 +43,19 @@ const INITIAL_LOGS: WorkoutLog[] = [
         durationMinutes: 60,
         totalVolumeKg: 2400,
         exercises: [
-            { name: "Barbell Flat Bench Press", sets: 4, reps: 10, weightKg: 60 },
+            {
+                name: "Barbell Flat Bench Press",
+                sets: 4,
+                reps: 10,
+                weightKg: 60,
+                completedSetsCount: 4,
+                setDetails: [
+                    { setNumber: 1, reps: 10, weightKg: 60, completed: true },
+                    { setNumber: 2, reps: 10, weightKg: 60, completed: true },
+                    { setNumber: 3, reps: 10, weightKg: 60, completed: true },
+                    { setNumber: 4, reps: 10, weightKg: 60, completed: true },
+                ],
+            },
         ],
     },
     {
@@ -46,10 +65,56 @@ const INITIAL_LOGS: WorkoutLog[] = [
         durationMinutes: 65,
         totalVolumeKg: 4850,
         exercises: [
-            { name: "Barbell Flat Bench Press", sets: 4, reps: 8, weightKg: 80 },
-            { name: "Incline Dumbbell Press", sets: 3, reps: 10, weightKg: 28 },
-            { name: "Cable Lateral Raises", sets: 4, reps: 15, weightKg: 12 },
-            { name: "Triceps Rope Pushdown", sets: 3, reps: 12, weightKg: 30 },
+            {
+                name: "Barbell Flat Bench Press",
+                sets: 4,
+                reps: 8,
+                weightKg: 80,
+                completedSetsCount: 4,
+                setDetails: [
+                    { setNumber: 1, reps: 8, weightKg: 80, completed: true },
+                    { setNumber: 2, reps: 8, weightKg: 80, completed: true },
+                    { setNumber: 3, reps: 8, weightKg: 80, completed: true },
+                    { setNumber: 4, reps: 8, weightKg: 80, completed: true },
+                ],
+            },
+            {
+                name: "Incline Dumbbell Press",
+                sets: 3,
+                reps: 10,
+                weightKg: 28,
+                completedSetsCount: 3,
+                setDetails: [
+                    { setNumber: 1, reps: 10, weightKg: 28, completed: true },
+                    { setNumber: 2, reps: 10, weightKg: 28, completed: true },
+                    { setNumber: 3, reps: 10, weightKg: 28, completed: true },
+                ],
+            },
+            {
+                name: "Cable Lateral Raises",
+                sets: 4,
+                reps: 15,
+                weightKg: 12,
+                completedSetsCount: 4,
+                setDetails: [
+                    { setNumber: 1, reps: 15, weightKg: 12, completed: true },
+                    { setNumber: 2, reps: 15, weightKg: 12, completed: true },
+                    { setNumber: 3, reps: 15, weightKg: 12, completed: true },
+                    { setNumber: 4, reps: 15, weightKg: 12, completed: true },
+                ],
+            },
+            {
+                name: "Triceps Rope Pushdown",
+                sets: 3,
+                reps: 12,
+                weightKg: 30,
+                completedSetsCount: 3,
+                setDetails: [
+                    { setNumber: 1, reps: 12, weightKg: 30, completed: true },
+                    { setNumber: 2, reps: 12, weightKg: 30, completed: true },
+                    { setNumber: 3, reps: 12, weightKg: 30, completed: true },
+                ],
+            },
         ],
     },
     {
@@ -59,23 +124,55 @@ const INITIAL_LOGS: WorkoutLog[] = [
         durationMinutes: 70,
         totalVolumeKg: 5400,
         exercises: [
-            { name: "Barbell Bent-Over Row", sets: 4, reps: 8, weightKg: 75 },
-            { name: "Weighted Pull-Up", sets: 3, reps: 6, weightKg: 15 },
-            { name: "Seated Cable Row", sets: 3, reps: 12, weightKg: 55 },
-            { name: "Incline Dumbbell Curl", sets: 3, reps: 12, weightKg: 14 },
-        ],
-    },
-    {
-        id: "log-4",
-        date: "2026-10-29",
-        split: "Leg Day",
-        durationMinutes: 75,
-        totalVolumeKg: 7200,
-        exercises: [
-            { name: "Barbell Back Squat", sets: 4, reps: 8, weightKg: 100 },
-            { name: "Romanian Deadlift (RDL)", sets: 3, reps: 10, weightKg: 90 },
-            { name: "Barbell Hip Thrust", sets: 3, reps: 12, weightKg: 110 },
-            { name: "Standing Calf Raises", sets: 4, reps: 15, weightKg: 40 },
+            {
+                name: "Barbell Bent-Over Row",
+                sets: 4,
+                reps: 8,
+                weightKg: 75,
+                completedSetsCount: 4,
+                setDetails: [
+                    { setNumber: 1, reps: 8, weightKg: 75, completed: true },
+                    { setNumber: 2, reps: 8, weightKg: 75, completed: true },
+                    { setNumber: 3, reps: 8, weightKg: 75, completed: true },
+                    { setNumber: 4, reps: 8, weightKg: 75, completed: true },
+                ],
+            },
+            {
+                name: "Weighted Pull-Up",
+                sets: 3,
+                reps: 6,
+                weightKg: 15,
+                completedSetsCount: 2,
+                setDetails: [
+                    { setNumber: 1, reps: 6, weightKg: 15, completed: true },
+                    { setNumber: 2, reps: 6, weightKg: 15, completed: true },
+                    { setNumber: 3, reps: 6, weightKg: 15, completed: false },
+                ],
+            },
+            {
+                name: "Seated Cable Row",
+                sets: 3,
+                reps: 12,
+                weightKg: 55,
+                completedSetsCount: 3,
+                setDetails: [
+                    { setNumber: 1, reps: 12, weightKg: 55, completed: true },
+                    { setNumber: 2, reps: 12, weightKg: 55, completed: true },
+                    { setNumber: 3, reps: 12, weightKg: 55, completed: true },
+                ],
+            },
+            {
+                name: "Incline Dumbbell Curl",
+                sets: 3,
+                reps: 12,
+                weightKg: 14,
+                completedSetsCount: 3,
+                setDetails: [
+                    { setNumber: 1, reps: 12, weightKg: 14, completed: true },
+                    { setNumber: 2, reps: 12, weightKg: 14, completed: true },
+                    { setNumber: 3, reps: 12, weightKg: 14, completed: true },
+                ],
+            },
         ],
     },
 ];
@@ -90,7 +187,7 @@ export default function WorkoutHistoryPage() {
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Rest Timer Mode (Circular progress)
+    // Rest Timer Mode
     const [isResting, setIsResting] = useState(false);
     const [restSecondsLeft, setRestSecondsLeft] = useState<number>(60);
     const restTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -109,6 +206,9 @@ export default function WorkoutHistoryPage() {
         },
     ]);
     const [newExerciseName, setNewExerciseName] = useState("");
+
+    // Inspect Past Workout Modal State
+    const [inspectedSession, setInspectedSession] = useState<WorkoutLog | null>(null);
 
     // Manual Quick Log Modal State
     const [showQuickLogModal, setShowQuickLogModal] = useState(false);
@@ -168,7 +268,6 @@ export default function WorkoutHistoryPage() {
         };
     }, [isResting, isPaused]);
 
-    // Formatter for MM:SS
     const formatTime = (totalSecs: number) => {
         const mins = Math.floor(totalSecs / 60);
         const secs = totalSecs % 60;
@@ -205,13 +304,15 @@ export default function WorkoutHistoryPage() {
             totalVol += exerciseVol;
             return {
                 name: ex.name,
-                sets: completedSets.length || ex.sets.length,
+                sets: ex.sets.length,
                 reps: ex.sets[0]?.reps || 10,
                 weightKg: ex.sets[0]?.weightKg || 50,
+                completedSetsCount: completedSets.length,
+                setDetails: ex.sets,
             };
         });
 
-        if (totalVol === 0) totalVol = 2000;
+        if (totalVol === 0) totalVol = 1800;
 
         const newLog: WorkoutLog = {
             id: `log-${Date.now()}`,
@@ -230,7 +331,6 @@ export default function WorkoutHistoryPage() {
         setIsPaused(false);
         setElapsedSeconds(0);
         setIsResting(false);
-        alert(`🎉 Workout Saved! Session duration: ${durationMins}m, Volume: ${(totalVol / 1000).toFixed(1)}k kg`);
     };
 
     const cancelLiveWorkout = () => {
@@ -240,6 +340,48 @@ export default function WorkoutHistoryPage() {
             setElapsedSeconds(0);
             setIsResting(false);
         }
+    };
+
+    // Resume a past session into the live tracker
+    const resumePastSession = (session: WorkoutLog) => {
+        setActiveSplit(session.split);
+        setElapsedSeconds(session.durationMinutes * 60);
+
+        const mappedExercises: WorkoutExercise[] = session.exercises.map((ex, idx) => {
+            if (ex.setDetails && ex.setDetails.length > 0) {
+                return {
+                    id: `ex-resume-${idx}-${Date.now()}`,
+                    name: ex.name,
+                    sets: ex.setDetails,
+                };
+            }
+            // Fallback if setDetails missing
+            const setsArr = [];
+            const totalCount = ex.sets || 3;
+            const completedCount = ex.completedSetsCount ?? totalCount;
+            for (let i = 1; i <= totalCount; i++) {
+                setsArr.push({
+                    setNumber: i,
+                    reps: ex.reps || 10,
+                    weightKg: ex.weightKg || 50,
+                    completed: i <= completedCount,
+                });
+            }
+            return {
+                id: `ex-resume-${idx}-${Date.now()}`,
+                name: ex.name,
+                sets: setsArr,
+            };
+        });
+
+        setActiveExercises(mappedExercises);
+        setIsPaused(false);
+        setIsResting(false);
+        setIsLiveActive(true);
+        setInspectedSession(null);
+
+        // Scroll smoothly to top
+        window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
     const toggleSetComplete = (exId: string, setNumber: number) => {
@@ -301,11 +443,13 @@ export default function WorkoutHistoryPage() {
         setNewExerciseName("");
     };
 
-    const deletePastLog = (id: string) => {
+    const deletePastLog = (id: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
         if (window.confirm("Permanently delete this workout log?")) {
             const filtered = logs.filter((l) => l.id !== id);
             setLogs(filtered);
             localStorage.setItem("ironcore_workout_history", JSON.stringify(filtered));
+            if (inspectedSession?.id === id) setInspectedSession(null);
         }
     };
 
@@ -324,6 +468,7 @@ export default function WorkoutHistoryPage() {
                     sets: manualSets,
                     reps: manualReps,
                     weightKg: manualWeight,
+                    completedSetsCount: manualSets,
                 },
             ],
         };
@@ -335,7 +480,7 @@ export default function WorkoutHistoryPage() {
 
     if (!isMounted) return null;
 
-    // Circular progress stroke calculation (radius = 90)
+    // Circular progress calculations
     const radius = 90;
     const circumference = 2 * Math.PI * radius;
     const progressRatio = isResting
@@ -349,7 +494,7 @@ export default function WorkoutHistoryPage() {
     return (
         <div className="min-h-screen bg-[#0e0e10] text-[#f4f4f5] pt-8 sm:pt-10 pb-28 px-4 sm:px-8 font-sans selection:bg-[#00ff87]/30 print:bg-white print:text-black print:p-0">
             <div className="max-w-5xl mx-auto space-y-6">
-                {/* Header (Hidden on Print) */}
+                {/* Navigation & Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800/80 pb-5 print:hidden">
                     <div>
                         <Link
@@ -362,7 +507,7 @@ export default function WorkoutHistoryPage() {
                             WORKOUT <span className="text-[#00ff87]">HISTORY & SESSIONS</span>
                         </h1>
                         <p className="text-xs text-zinc-400 mt-1">
-                            Mobile circular stopwatch, live set logger, progressive overload tracking, and performance export.
+                            Click any workout card below to inspect completed sets, volume details, or resume training.
                         </p>
                     </div>
 
@@ -398,11 +543,10 @@ export default function WorkoutHistoryPage() {
                 </div>
 
                 {/* ========================================================================= */}
-                {/* MOBILE CIRCULAR STOPWATCH / TIMER HERO CARD                              */}
+                {/* MOBILE CIRCULAR STOPWATCH / TIMER ACTIVE CARD                            */}
                 {/* ========================================================================= */}
                 {isLiveActive && (
                     <div className="bg-[#121418] border-2 border-[#00ff87]/80 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-[#00ff87]/10 flex flex-col items-center justify-center space-y-6 animate-in fade-in duration-300">
-                        {/* Header info */}
                         <div className="w-full flex items-center justify-between text-xs font-semibold text-zinc-400 border-b border-zinc-800/80 pb-3">
                             <span className="uppercase tracking-widest text-[#00ff87] font-bold">
                                 {isResting ? "REST INTERVAL" : `${activeSplit.toUpperCase()} ACTIVE`}
@@ -412,19 +556,9 @@ export default function WorkoutHistoryPage() {
                             </span>
                         </div>
 
-                        {/* Circular Gauge Ring */}
                         <div className="relative w-64 h-64 flex items-center justify-center select-none">
                             <svg className="w-full h-full transform -rotate-90" viewBox="0 0 200 200">
-                                {/* Background Ring */}
-                                <circle
-                                    cx="100"
-                                    cy="100"
-                                    r={radius}
-                                    stroke="#1c1e24"
-                                    strokeWidth="12"
-                                    fill="transparent"
-                                />
-                                {/* Animated Glowing Foreground Progress Ring */}
+                                <circle cx="100" cy="100" r={radius} stroke="#1c1e24" strokeWidth="12" fill="transparent" />
                                 <circle
                                     cx="100"
                                     cy="100"
@@ -439,7 +573,6 @@ export default function WorkoutHistoryPage() {
                                 />
                             </svg>
 
-                            {/* Time Display Inside Circle */}
                             <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                                 <span className="text-4xl sm:text-5xl font-black text-white font-mono tracking-tight">
                                     {isResting ? formatTime(restSecondsLeft) : formatTime(elapsedSeconds)}
@@ -450,9 +583,7 @@ export default function WorkoutHistoryPage() {
                             </div>
                         </div>
 
-                        {/* Mobile Styled Controls: Reset (↺), Play/Pause (▶), Finish (⏹) */}
                         <div className="flex items-center gap-4">
-                            {/* Reset Button */}
                             <button
                                 onClick={resetCurrentTimer}
                                 className="w-14 h-14 rounded-2xl bg-[#1b1d24] hover:bg-[#252833] text-zinc-300 border border-zinc-700/80 flex items-center justify-center text-xl transition-all shadow-md active:scale-95"
@@ -461,19 +592,15 @@ export default function WorkoutHistoryPage() {
                                 ↺
                             </button>
 
-                            {/* Central Play/Pause Button */}
                             <button
                                 onClick={togglePause}
-                                className={`w-20 h-14 rounded-2xl flex items-center justify-center text-2xl font-bold transition-all shadow-xl active:scale-95 ${isPaused
-                                        ? "bg-[#00ff87] text-black shadow-[#00ff87]/30"
-                                        : "bg-[#00e57a] text-black hover:bg-[#00ff87]"
+                                className={`w-20 h-14 rounded-2xl flex items-center justify-center text-2xl font-bold transition-all shadow-xl active:scale-95 ${isPaused ? "bg-[#00ff87] text-black shadow-[#00ff87]/30" : "bg-[#00e57a] text-black hover:bg-[#00ff87]"
                                     }`}
                                 title={isPaused ? "Resume" : "Pause"}
                             >
                                 {isPaused ? "▶" : "⏸"}
                             </button>
 
-                            {/* Stop & Finish Button */}
                             <button
                                 onClick={finishAndSaveLiveWorkout}
                                 className="w-14 h-14 rounded-2xl bg-[#1b1d24] hover:bg-[#252833] text-zinc-300 border border-zinc-700/80 flex items-center justify-center text-base transition-all shadow-md active:scale-95"
@@ -483,20 +610,13 @@ export default function WorkoutHistoryPage() {
                             </button>
                         </div>
 
-                        <span className="text-[11px] font-mono text-zinc-500">
-                            {isResting ? "Next: Return to Set" : "Next: Rest 00:60 on set completion"}
-                        </span>
-
-                        {/* Live Exercises Tracker Section */}
+                        {/* Live Exercises Tracker */}
                         <div className="w-full space-y-4 pt-4 border-t border-zinc-800/80">
                             <div className="flex items-center justify-between">
                                 <span className="text-xs font-bold text-white uppercase tracking-wider">
-                                    Session Exercises & Sets
+                                    Session Movements & Sets
                                 </span>
-                                <button
-                                    onClick={cancelLiveWorkout}
-                                    className="text-xs text-red-400 hover:underline"
-                                >
+                                <button onClick={cancelLiveWorkout} className="text-xs text-red-400 hover:underline">
                                     Discard Workout
                                 </button>
                             </div>
@@ -606,21 +726,29 @@ export default function WorkoutHistoryPage() {
                     </div>
                 </div>
 
-                {/* Past Sessions List */}
+                {/* ========================================================================= */}
+                {/* PAST SESSIONS LIST (NOW FULLY CLICKABLE WITH HOVER FEEDBACK)              */}
+                {/* ========================================================================= */}
                 <div className="space-y-4">
-                    <h3 className="text-sm font-bold text-white print:text-black uppercase tracking-wider">
-                        Past Training Sessions ({logs.length})
-                    </h3>
+                    <div className="flex items-center justify-between text-xs text-zinc-400 px-1">
+                        <h3 className="text-sm font-bold text-white print:text-black uppercase tracking-wider">
+                            Past Training Sessions ({logs.length})
+                        </h3>
+                        <span className="text-[11px] text-[#00ff87] font-semibold">
+                            💡 Tip: Click any card to inspect or resume session
+                        </span>
+                    </div>
 
                     <div className="space-y-3">
                         {logs.map((log) => (
                             <div
                                 key={log.id}
-                                className="bg-[#141518] print:bg-zinc-50 border border-zinc-800/80 print:border-zinc-300 rounded-2xl p-5 shadow-lg space-y-4 group relative"
+                                onClick={() => setInspectedSession(log)}
+                                className="bg-[#141518] hover:bg-[#181a20] print:bg-zinc-50 border border-zinc-800/80 hover:border-[#00ff87]/60 print:border-zinc-300 rounded-2xl p-5 shadow-lg space-y-4 group cursor-pointer transition-all duration-200 relative hover:shadow-[#00ff87]/5"
                             >
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800/60 print:border-zinc-200 pb-3">
                                     <div className="flex items-center gap-3">
-                                        <span className="px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider bg-[#00ff87]/10 text-[#00ff87] border border-[#00ff87]/30 print:border-emerald-600 print:text-emerald-800">
+                                        <span className="px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider bg-[#00ff87]/10 text-[#00ff87] border border-[#00ff87]/30 group-hover:bg-[#00ff87] group-hover:text-black transition-colors">
                                             {log.split}
                                         </span>
                                         <span className="text-xs font-mono text-zinc-400 print:text-zinc-600 font-bold">
@@ -637,8 +765,8 @@ export default function WorkoutHistoryPage() {
                                         </span>
 
                                         <button
-                                            onClick={() => deletePastLog(log.id)}
-                                            className="print:hidden text-zinc-500 hover:text-red-400 p-1 rounded-lg transition-colors"
+                                            onClick={(e) => deletePastLog(log.id, e)}
+                                            className="print:hidden text-zinc-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-zinc-800/60 transition-colors"
                                             title="Delete this session"
                                         >
                                             🗑️
@@ -650,7 +778,7 @@ export default function WorkoutHistoryPage() {
                                     {log.exercises.map((item, idx) => (
                                         <div
                                             key={idx}
-                                            className="flex items-center justify-between bg-[#1b1c20] print:bg-white border border-zinc-800/80 print:border-zinc-200 rounded-xl p-3 text-xs"
+                                            className="flex items-center justify-between bg-[#1b1c20] group-hover:bg-[#1e2026] print:bg-white border border-zinc-800/80 print:border-zinc-200 rounded-xl p-3 text-xs transition-colors"
                                         >
                                             <span className="font-semibold text-zinc-200 print:text-black truncate pr-2">
                                                 • {item.name}
@@ -661,11 +789,118 @@ export default function WorkoutHistoryPage() {
                                         </div>
                                     ))}
                                 </div>
+
+                                <div className="flex items-center justify-end text-[11px] font-semibold text-[#00ff87] pt-1">
+                                    <span>View Details & Resume Sets →</span>
+                                </div>
                             </div>
                         ))}
                     </div>
                 </div>
             </div>
+
+            {/* ========================================================================= */}
+            {/* SESSION INSPECT & RESUME MODAL                                           */}
+            {/* ========================================================================= */}
+            {inspectedSession && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 print:hidden animate-in fade-in duration-150">
+                    <div className="bg-[#141518] border border-zinc-800 rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-5">
+                        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                            <div>
+                                <span className="text-[10px] font-mono text-[#00ff87] uppercase tracking-wider block font-bold">
+                                    {inspectedSession.split} • {inspectedSession.date}
+                                </span>
+                                <h3 className="text-xl font-black text-white mt-0.5">Session Overview</h3>
+                            </div>
+                            <button
+                                onClick={() => setInspectedSession(null)}
+                                className="text-zinc-400 hover:text-white text-base px-2 py-1"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Quick Metrics */}
+                        <div className="grid grid-cols-3 gap-2 text-center">
+                            <div className="bg-[#1b1c20] p-3 rounded-xl border border-zinc-800/80">
+                                <span className="text-[10px] text-zinc-400 uppercase font-semibold block">Duration</span>
+                                <span className="text-lg font-black text-white font-mono">{inspectedSession.durationMinutes}m</span>
+                            </div>
+                            <div className="bg-[#1b1c20] p-3 rounded-xl border border-zinc-800/80">
+                                <span className="text-[10px] text-zinc-400 uppercase font-semibold block">Volume Lifted</span>
+                                <span className="text-lg font-black text-[#00ff87] font-mono">{inspectedSession.totalVolumeKg} kg</span>
+                            </div>
+                            <div className="bg-[#1b1c20] p-3 rounded-xl border border-zinc-800/80">
+                                <span className="text-[10px] text-zinc-400 uppercase font-semibold block">Movements</span>
+                                <span className="text-lg font-black text-zinc-200 font-mono">{inspectedSession.exercises.length}</span>
+                            </div>
+                        </div>
+
+                        {/* Exercise & Set Breakdown */}
+                        <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+                            <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">
+                                Exercise Set Breakdown
+                            </span>
+
+                            {inspectedSession.exercises.map((ex, i) => (
+                                <div key={i} className="bg-[#181a20] border border-zinc-800/90 rounded-xl p-3.5 space-y-2">
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="font-bold text-white flex items-center gap-1.5">
+                                            <span className="text-[#00ff87]">🏋️</span> {ex.name}
+                                        </span>
+                                        <span className="font-mono text-zinc-400 text-[11px]">
+                                            {ex.sets} sets • {ex.weightKg}kg
+                                        </span>
+                                    </div>
+
+                                    {/* Set completion indicator */}
+                                    <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                                        {Array.from({ length: ex.sets }).map((_, sIdx) => {
+                                            const isDone = sIdx < (ex.completedSetsCount ?? ex.sets);
+                                            return (
+                                                <span
+                                                    key={sIdx}
+                                                    className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${isDone
+                                                            ? "bg-[#00ff87]/20 text-[#00ff87] border border-[#00ff87]/30"
+                                                            : "bg-zinc-800 text-zinc-400 border border-zinc-700"
+                                                        }`}
+                                                >
+                                                    Set {sIdx + 1}: {isDone ? "✓ Done" : "Skipped"}
+                                                </span>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Modal Bottom Actions */}
+                        <div className="pt-3 border-t border-zinc-800 flex items-center justify-between gap-3">
+                            <button
+                                onClick={() => deletePastLog(inspectedSession.id)}
+                                className="px-3.5 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-bold transition-colors border border-red-500/30"
+                            >
+                                🗑️ Delete
+                            </button>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setInspectedSession(null)}
+                                    className="px-4 py-2 rounded-xl bg-[#1b1c20] hover:bg-zinc-800 text-zinc-300 text-xs font-semibold transition-colors"
+                                >
+                                    Close
+                                </button>
+                                <button
+                                    onClick={() => resumePastSession(inspectedSession)}
+                                    className="px-4 py-2 rounded-xl bg-[#00ff87] hover:bg-[#00e57a] text-black text-xs font-extrabold transition-all shadow-lg shadow-[#00ff87]/20 flex items-center gap-1.5"
+                                >
+                                    <span>⚡</span> Resume Session
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Manual Quick Log Modal */}
             {showQuickLogModal && (
@@ -673,10 +908,7 @@ export default function WorkoutHistoryPage() {
                     <div className="bg-[#141518] border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
                         <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
                             <h3 className="text-base font-bold text-white">Log Past Session Manually</h3>
-                            <button
-                                onClick={() => setShowQuickLogModal(false)}
-                                className="text-zinc-400 hover:text-white text-sm"
-                            >
+                            <button onClick={() => setShowQuickLogModal(false)} className="text-zinc-400 hover:text-white text-sm">
                                 ✕
                             </button>
                         </div>
