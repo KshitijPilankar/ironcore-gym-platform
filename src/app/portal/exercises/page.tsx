@@ -269,18 +269,22 @@ export default function ExerciseEnginePage() {
                                     </div>
 
                                     {/* Exercise Still Illustration Thumbnail */}
-                                    <div className="w-full h-36 bg-[#0c0d0f] rounded-xl border border-zinc-800/80 flex items-center justify-center p-2 overflow-hidden relative">
+                                    <div
+                                        className="w-full h-36 rounded-xl border border-zinc-700/60 flex items-center justify-center p-2 overflow-hidden relative shadow-inner"
+                                        style={{ background: "radial-gradient(circle at center, #272a31 0%, #121316 75%, #0a0a0c 100%)" }}
+                                    >
                                         {ex.img ? (
                                             <img
                                                 src={`/api/media/still/${ex.img}`}
                                                 alt={ex.n}
                                                 loading="lazy"
-                                                className="w-full h-full object-contain filter invert contrast-125 transition-transform duration-300 group-hover:scale-105"
+                                                className="w-full h-full object-contain will-change-transform transition-transform duration-300 group-hover:scale-105"
+                                                style={{ filter: "brightness(1.28) contrast(1.18)" }}
                                             />
                                         ) : (
                                             <span className="text-zinc-600 text-xs">No preview</span>
                                         )}
-                                        <span className="absolute bottom-2 right-2 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-black/60 text-zinc-400 backdrop-blur-sm border border-zinc-800">
+                                        <span className="absolute bottom-2 right-2 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-black/60 text-zinc-300 backdrop-blur-sm border border-zinc-800">
                                             {ex.cat || "Movement"}
                                         </span>
                                     </div>
@@ -363,8 +367,11 @@ export default function ExerciseEnginePage() {
                             </button>
                         </div>
 
-                        {/* Looping 3-Second Movement Video / Animation */}
-                        <div className="w-full h-64 bg-[#0a0a0c] rounded-xl border border-zinc-800/90 overflow-hidden flex items-center justify-center relative shadow-inner">
+                        {/* Looping 3-Second Movement Video / Animation with Studio Ambient Backdrop */}
+                        <div
+                            className="w-full h-64 sm:h-72 rounded-2xl border border-zinc-700/60 overflow-hidden flex items-center justify-center relative shadow-inner"
+                            style={{ background: "radial-gradient(circle at center, #272a31 0%, #121316 75%, #0a0a0c 100%)" }}
+                        >
                             {activeModalExercise.gif ? (
                                 <video
                                     src={`/api/media/clip/${activeModalExercise.gif}`}
@@ -373,19 +380,21 @@ export default function ExerciseEnginePage() {
                                     loop
                                     muted
                                     playsInline
-                                    className="w-full h-full object-contain filter invert contrast-125"
+                                    className="w-full h-full object-contain scale-105 will-change-transform"
+                                    style={{ filter: "brightness(1.28) contrast(1.18)" }}
                                 />
                             ) : activeModalExercise.img ? (
                                 <img
                                     src={`/api/media/still/${activeModalExercise.img}`}
                                     alt={activeModalExercise.n}
-                                    className="w-full h-full object-contain filter invert contrast-125"
+                                    className="w-full h-full object-contain scale-105 will-change-transform"
+                                    style={{ filter: "brightness(1.28) contrast(1.18)" }}
                                 />
                             ) : (
                                 <span className="text-zinc-500 text-xs">No media available</span>
                             )}
 
-                            <span className="absolute bottom-2.5 left-2.5 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-black/70 text-zinc-300 backdrop-blur-sm border border-zinc-800 flex items-center gap-1">
+                            <span className="absolute bottom-2.5 left-2.5 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-black/70 text-zinc-300 backdrop-blur-sm border border-zinc-800 flex items-center gap-1 z-10">
                                 <span className="w-1.5 h-1.5 rounded-full bg-[#00ff87] animate-pulse" />
                                 Looping Vector Execution
                             </span>
