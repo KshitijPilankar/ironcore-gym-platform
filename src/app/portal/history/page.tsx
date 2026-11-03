@@ -1,12 +1,23 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+
+interface WorkoutExercise {
+    id: string;
+    name: string;
+    sets: {
+        setNumber: number;
+        reps: number;
+        weightKg: number;
+        completed: boolean;
+    }[];
+}
 
 interface WorkoutLog {
     id: string;
     date: string;
-    split: "Push Day" | "Pull Day" | "Leg Day" | "Full Body" | "Cardio Core";
+    split: string;
     durationMinutes: number;
     totalVolumeKg: number;
     exercises: {
@@ -20,6 +31,16 @@ interface WorkoutLog {
 const INITIAL_LOGS: WorkoutLog[] = [
     {
         id: "log-1",
+        date: "2026-11-03",
+        split: "Push Day",
+        durationMinutes: 60,
+        totalVolumeKg: 2400,
+        exercises: [
+            { name: "Barbell Flat Bench Press", sets: 4, reps: 10, weightKg: 60 },
+        ],
+    },
+    {
+        id: "log-2",
         date: "2026-11-02",
         split: "Push Day",
         durationMinutes: 65,
@@ -32,7 +53,7 @@ const INITIAL_LOGS: WorkoutLog[] = [
         ],
     },
     {
-        id: "log-2",
+        id: "log-3",
         date: "2026-10-31",
         split: "Pull Day",
         durationMinutes: 70,
@@ -45,7 +66,7 @@ const INITIAL_LOGS: WorkoutLog[] = [
         ],
     },
     {
-        id: "log-3",
+        id: "log-4",
         date: "2026-10-29",
         split: "Leg Day",
         durationMinutes: 75,
@@ -62,15 +83,40 @@ const INITIAL_LOGS: WorkoutLog[] = [
 export default function WorkoutHistoryPage() {
     const [logs, setLogs] = useState<WorkoutLog[]>([]);
     const [isMounted, setIsMounted] = useState(false);
-    const [showLogModal, setShowLogModal] = useState(false);
 
-    // Form State for new entry
-    const [splitName, setSplitName] = useState<WorkoutLog["split"]>("Push Day");
-    const [duration, setDuration] = useState<number>(60);
-    const [exerciseInput, setExerciseInput] = useState<string>("Barbell Flat Bench Press");
-    const [setsInput, setSetsInput] = useState<number>(4);
-    const [repsInput, setRepsInput] = useState<number>(10);
-    const [weightInput, setWeightInput] = useState<number>(60);
+    // Live Workout Tracker State
+    const [isLiveActive, setIsLiveActive] = useState(false);
+    const [isPaused, setIsPaused] = useState(false);
+    const [elapsedSeconds, setElapsedSeconds] = useState(0);
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Active Workout Setup
+    const [activeSplit, setActiveSplit] = useState("Push Day");
+    const [activeExercises, setActiveExercises] = useState<WorkoutExercise[]>([
+        {
+            id: "ex-live-1",
+            name: "Barbell Flat Bench Press",
+            sets: [
+                { setNumber: 1, reps: 10, weightKg: 60, completed: true },
+                { setNumber: 2, reps: 10, weightKg: 60, completed: false },
+                { setNumber: 3, reps: 8, weightKg: 65, completed: false },
+            ],
+        },
+    ]);
+    const [newExerciseName, setNewExerciseName] = useState("");
+
+    // Quick Rest Timer (e.g. 60s)
+    const [restSecondsLeft, setRestSecondsLeft] = useState<number | null>(null);
+    const restTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Manual Quick Log Modal State
+    const [showQuickLogModal, setShowQuickLogModal] = useState(false);
+    const [manualSplit, setManualSplit] = useState("Push Day");
+    const [manualExercise, setManualExercise] = useState("Barbell Flat Bench Press");
+    const [manualSets, setManualSets] = useState(4);
+    const [manualReps, setManualReps] = useState(10);
+    const [manualWeight, setManualWeight] = useState(60);
+    const [manualDuration, setManualDuration] = useState(60);
 
     useEffect(() => {
         setIsMounted(true);
@@ -78,7 +124,7 @@ export default function WorkoutHistoryPage() {
         if (stored) {
             try {
                 setLogs(JSON.parse(stored));
-            } catch (e) {
+            } catch {
                 setLogs(INITIAL_LOGS);
             }
         } else {
@@ -87,35 +133,191 @@ export default function WorkoutHistoryPage() {
         }
     }, []);
 
-    const handleSaveWorkout = (e: React.FormEvent) => {
-        e.preventDefault();
+    // Stopwatch interval logic
+    useEffect(() => {
+        if (isLiveActive && !isPaused) {
+            timerRef.current = setInterval(() => {
+                setElapsedSeconds((prev) => prev + 1);
+            }, 1000);
+        } else {
+            if (timerRef.current) clearInterval(timerRef.current);
+        }
+        return () => {
+            if (timerRef.current) clearInterval(timerRef.current);
+        };
+    }, [isLiveActive, isPaused]);
+
+    // Rest Timer interval logic
+    useEffect(() => {
+        if (restSecondsLeft !== null && restSecondsLeft > 0) {
+            restTimerRef.current = setInterval(() => {
+                setRestSecondsLeft((prev) => (prev !== null && prev > 1 ? prev - 1 : null));
+            }, 1000);
+        } else {
+            if (restTimerRef.current) clearInterval(restTimerRef.current);
+        }
+        return () => {
+            if (restTimerRef.current) clearInterval(restTimerRef.current);
+        };
+    }, [restSecondsLeft]);
+
+    const formatTimer = (totalSecs: number) => {
+        const hrs = Math.floor(totalSecs / 3600);
+        const mins = Math.floor((totalSecs % 3600) / 60);
+        const secs = totalSecs % 60;
+        if (hrs > 0) {
+            return `${String(hrs).padStart(2, "0")}:${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+        }
+        return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+    };
+
+    const startLiveWorkout = () => {
+        setElapsedSeconds(0);
+        setIsPaused(false);
+        setIsLiveActive(true);
+    };
+
+    const togglePause = () => {
+        setIsPaused(!isPaused);
+    };
+
+    const cancelLiveWorkout = () => {
+        if (window.confirm("Are you sure you want to discard this live workout session?")) {
+            setIsLiveActive(false);
+            setIsPaused(false);
+            setElapsedSeconds(0);
+            setRestSecondsLeft(null);
+        }
+    };
+
+    const finishAndSaveLiveWorkout = () => {
         const today = new Date().toISOString().split("T")[0];
-        const totalVol = setsInput * repsInput * weightInput;
+        const durationMins = Math.max(1, Math.round(elapsedSeconds / 60));
+
+        // Calculate total completed sets & volume
+        let totalVol = 0;
+        const finalExercises = activeExercises.map((ex) => {
+            const completedSets = ex.sets.filter((s) => s.completed);
+            const exerciseVol = completedSets.reduce((sum, s) => sum + s.reps * s.weightKg, 0);
+            totalVol += exerciseVol;
+            return {
+                name: ex.name,
+                sets: completedSets.length || ex.sets.length,
+                reps: ex.sets[0]?.reps || 10,
+                weightKg: ex.sets[0]?.weightKg || 50,
+            };
+        });
+
+        if (totalVol === 0) {
+            totalVol = 1800; // default baseline if no sets checked
+        }
 
         const newLog: WorkoutLog = {
             id: `log-${Date.now()}`,
             date: today,
-            split: splitName,
-            durationMinutes: duration,
+            split: activeSplit,
+            durationMinutes: durationMins,
             totalVolumeKg: totalVol,
-            exercises: [
-                {
-                    name: exerciseInput,
-                    sets: setsInput,
-                    reps: repsInput,
-                    weightKg: weightInput,
-                },
-            ],
+            exercises: finalExercises,
         };
 
         const updated = [newLog, ...logs];
         setLogs(updated);
         localStorage.setItem("ironcore_workout_history", JSON.stringify(updated));
-        setShowLogModal(false);
+
+        setIsLiveActive(false);
+        setIsPaused(false);
+        setElapsedSeconds(0);
+        setRestSecondsLeft(null);
+        alert(`🎉 Workout Completed! Logged ${durationMins} mins and ${(totalVol / 1000).toFixed(1)}k kg volume.`);
     };
 
-    const handlePrintReport = () => {
-        window.print();
+    const toggleSetComplete = (exId: string, setNumber: number) => {
+        setActiveExercises((prev) =>
+            prev.map((ex) => {
+                if (ex.id !== exId) return ex;
+                return {
+                    ...ex,
+                    sets: ex.sets.map((s) => {
+                        if (s.setNumber !== setNumber) return s;
+                        const willComplete = !s.completed;
+                        if (willComplete) setRestSecondsLeft(60); // start 60s rest
+                        return { ...s, completed: willComplete };
+                    }),
+                };
+            })
+        );
+    };
+
+    const addSetToExercise = (exId: string) => {
+        setActiveExercises((prev) =>
+            prev.map((ex) => {
+                if (ex.id !== exId) return ex;
+                const lastSet = ex.sets[ex.sets.length - 1];
+                return {
+                    ...ex,
+                    sets: [
+                        ...ex.sets,
+                        {
+                            setNumber: ex.sets.length + 1,
+                            reps: lastSet ? lastSet.reps : 10,
+                            weightKg: lastSet ? lastSet.weightKg : 50,
+                            completed: false,
+                        },
+                    ],
+                };
+            })
+        );
+    };
+
+    const addExerciseToActiveWorkout = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newExerciseName.trim()) return;
+        setActiveExercises((prev) => [
+            ...prev,
+            {
+                id: `ex-live-${Date.now()}`,
+                name: newExerciseName.trim(),
+                sets: [
+                    { setNumber: 1, reps: 10, weightKg: 50, completed: false },
+                    { setNumber: 2, reps: 10, weightKg: 50, completed: false },
+                    { setNumber: 3, reps: 8, weightKg: 55, completed: false },
+                ],
+            },
+        ]);
+        setNewExerciseName("");
+    };
+
+    const deletePastLog = (id: string) => {
+        if (window.confirm("Do you want to permanently delete this workout session?")) {
+            const filtered = logs.filter((l) => l.id !== id);
+            setLogs(filtered);
+            localStorage.setItem("ironcore_workout_history", JSON.stringify(filtered));
+        }
+    };
+
+    const handleManualQuickLog = (e: React.FormEvent) => {
+        e.preventDefault();
+        const today = new Date().toISOString().split("T")[0];
+        const newLog: WorkoutLog = {
+            id: `log-${Date.now()}`,
+            date: today,
+            split: manualSplit,
+            durationMinutes: manualDuration,
+            totalVolumeKg: manualSets * manualReps * manualWeight,
+            exercises: [
+                {
+                    name: manualExercise,
+                    sets: manualSets,
+                    reps: manualReps,
+                    weightKg: manualWeight,
+                },
+            ],
+        };
+        const updated = [newLog, ...logs];
+        setLogs(updated);
+        localStorage.setItem("ironcore_workout_history", JSON.stringify(updated));
+        setShowQuickLogModal(false);
     };
 
     if (!isMounted) return null;
@@ -124,7 +326,7 @@ export default function WorkoutHistoryPage() {
     const cumulativeVolume = logs.reduce((acc, curr) => acc + curr.totalVolumeKg, 0);
 
     return (
-        <div className="min-h-screen bg-[#0e0e10] text-[#f4f4f5] pt-8 sm:pt-10 pb-24 px-4 sm:px-8 font-sans selection:bg-[#00ff87]/30 print:bg-white print:text-black print:p-0">
+        <div className="min-h-screen bg-[#0e0e10] text-[#f4f4f5] pt-8 sm:pt-10 pb-28 px-4 sm:px-8 font-sans selection:bg-[#00ff87]/30 print:bg-white print:text-black print:p-0">
             <div className="max-w-5xl mx-auto space-y-6">
                 {/* Navigation & Header (Hidden on Print) */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800/80 pb-5 print:hidden">
@@ -139,27 +341,180 @@ export default function WorkoutHistoryPage() {
                             WORKOUT <span className="text-[#00ff87]">HISTORY & SESSIONS</span>
                         </h1>
                         <p className="text-xs text-zinc-400 mt-1">
-                            Historical workout logbook, progressive overload tracking, and performance export.
+                            Live session stopwatch, set logbook, progressive overload tracking, and performance export.
                         </p>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                        {!isLiveActive ? (
+                            <button
+                                onClick={startLiveWorkout}
+                                className="bg-[#00ff87] hover:bg-[#00e57a] text-black font-extrabold text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-[#00ff87]/20 flex items-center gap-2"
+                            >
+                                <span>▶</span> Start Live Workout
+                            </button>
+                        ) : (
+                            <div className="flex items-center gap-2">
+                                <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
+                                <span className="text-xs font-mono font-bold text-red-400">Workout In Progress</span>
+                            </div>
+                        )}
+
                         <button
-                            onClick={() => setShowLogModal(true)}
-                            className="bg-[#00ff87] hover:bg-[#00e57a] text-black font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-[#00ff87]/20 flex items-center gap-1.5"
+                            onClick={() => setShowQuickLogModal(true)}
+                            className="bg-[#141518] hover:bg-[#1b1c20] border border-zinc-800 text-zinc-300 font-semibold text-xs px-3.5 py-2.5 rounded-xl transition-all"
                         >
-                            <span>+</span> Log New Session
+                            + Quick Manual Log
                         </button>
+
                         <button
-                            onClick={handlePrintReport}
-                            className="bg-[#141518] hover:bg-[#1b1c20] border border-zinc-800 text-zinc-300 font-semibold text-xs px-4 py-2.5 rounded-xl transition-all flex items-center gap-2"
+                            onClick={() => window.print()}
+                            className="bg-[#141518] hover:bg-[#1b1c20] border border-zinc-800 text-zinc-300 font-semibold text-xs px-3.5 py-2.5 rounded-xl transition-all flex items-center gap-1.5"
                         >
-                            <span>📄</span> Export PDF Report
+                            <span>📄</span> Export PDF
                         </button>
                     </div>
                 </div>
 
-                {/* Printable Official Header (Shows only on print) */}
+                {/* ========================================================================= */}
+                {/* LIVE WORKOUT TRACKER DOCK (Appears when active workout is started)        */}
+                {/* ========================================================================= */}
+                {isLiveActive && (
+                    <div className="bg-[#121418] border-2 border-[#00ff87]/80 rounded-2xl p-5 shadow-2xl shadow-[#00ff87]/10 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+                        {/* Stopwatch HUD Header */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800/80 pb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-[#181a20] rounded-xl border border-zinc-800 text-xl font-mono font-black text-[#00ff87]">
+                                    ⏱️ {formatTimer(elapsedSeconds)}
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold text-white uppercase tracking-wider">
+                                            {activeSplit}
+                                        </span>
+                                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">
+                                            {isPaused ? "PAUSED" : "ACTIVE"}
+                                        </span>
+                                    </div>
+                                    <span className="text-xs text-zinc-400">
+                                        {restSecondsLeft ? `Rest Timer: ${restSecondsLeft}s remaining` : "Logging live sets & resistance"}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Action Controls: Pause, Complete, Discard */}
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={togglePause}
+                                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border ${isPaused
+                                            ? "bg-amber-400 text-black border-amber-400 shadow-md shadow-amber-400/20"
+                                            : "bg-[#181a20] text-zinc-200 border-zinc-800 hover:text-white"
+                                        }`}
+                                >
+                                    {isPaused ? "▶ Resume" : "⏸ Pause"}
+                                </button>
+
+                                <button
+                                    onClick={finishAndSaveLiveWorkout}
+                                    className="bg-[#00ff87] hover:bg-[#00e57a] text-black font-extrabold text-xs px-4 py-2 rounded-xl shadow-lg shadow-[#00ff87]/20 transition-all flex items-center gap-1.5"
+                                >
+                                    <span>✓</span> Complete Session
+                                </button>
+
+                                <button
+                                    onClick={cancelLiveWorkout}
+                                    className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-3 py-2 rounded-xl text-xs font-bold transition-all"
+                                    title="Discard workout"
+                                >
+                                    ✕ Discard
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Split Switcher */}
+                        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none text-xs">
+                            <span className="text-zinc-500 text-[11px] font-bold uppercase">Split:</span>
+                            {["Push Day", "Pull Day", "Leg Day", "Full Body", "Cardio Core"].map((s) => (
+                                <button
+                                    key={s}
+                                    onClick={() => setActiveSplit(s)}
+                                    className={`px-3 py-1 rounded-lg font-semibold transition-all border ${activeSplit === s
+                                            ? "bg-[#00ff87] text-black border-[#00ff87]"
+                                            : "bg-[#181a20] text-zinc-400 border-zinc-800 hover:text-white"
+                                        }`}
+                                >
+                                    {s}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Live Exercises & Sets Table */}
+                        <div className="space-y-3">
+                            {activeExercises.map((ex) => (
+                                <div key={ex.id} className="bg-[#181a20] border border-zinc-800 rounded-xl p-4 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <h4 className="text-xs font-bold text-white flex items-center gap-2">
+                                            <span className="text-[#00ff87]">🏋️</span> {ex.name}
+                                        </h4>
+                                        <button
+                                            onClick={() => addSetToExercise(ex.id)}
+                                            className="text-[11px] font-bold text-[#00ff87] hover:underline"
+                                        >
+                                            + Add Set
+                                        </button>
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        {ex.sets.map((set) => (
+                                            <div
+                                                key={set.setNumber}
+                                                className={`flex items-center justify-between p-2 rounded-lg text-xs font-mono border transition-all ${set.completed
+                                                        ? "bg-[#00ff87]/10 border-[#00ff87]/30 text-white"
+                                                        : "bg-[#121418] border-zinc-800 text-zinc-400"
+                                                    }`}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <span className="font-bold text-zinc-500">Set {set.setNumber}</span>
+                                                    <span className="text-white font-bold">{set.weightKg} kg</span>
+                                                    <span>× {set.reps} reps</span>
+                                                </div>
+
+                                                <button
+                                                    onClick={() => toggleSetComplete(ex.id, set.setNumber)}
+                                                    className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all ${set.completed
+                                                            ? "bg-[#00ff87] text-black"
+                                                            : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+                                                        }`}
+                                                >
+                                                    {set.completed ? "✓ Done" : "Mark Set"}
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+
+                            {/* Add New Exercise to live session */}
+                            <form onSubmit={addExerciseToActiveWorkout} className="flex gap-2 pt-1">
+                                <input
+                                    type="text"
+                                    placeholder="Add another exercise to this session (e.g. Incline DB Press)..."
+                                    value={newExerciseName}
+                                    onChange={(e) => setNewExerciseName(e.target.value)}
+                                    className="flex-1 bg-[#181a20] border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#00ff87]"
+                                />
+                                <button
+                                    type="submit"
+                                    className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold rounded-xl transition-all"
+                                >
+                                    + Add Movement
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* Printable Official Header (Shows only on PDF print) */}
                 <div className="hidden print:block border-b-2 border-black pb-4 mb-6">
                     <h2 className="text-2xl font-black tracking-tight text-black">
                         IRONCORE ATHLETE PERFORMANCE REPORT
@@ -194,22 +549,22 @@ export default function WorkoutHistoryPage() {
                             Avg Session Length
                         </span>
                         <span className="text-2xl font-black text-zinc-200 print:text-black font-mono mt-1 block">
-                            ~70 <span className="text-xs font-normal text-zinc-400">min</span>
+                            ~65 <span className="text-xs font-normal text-zinc-400">min</span>
                         </span>
                     </div>
                 </div>
 
-                {/* History Feed List */}
+                {/* Past Sessions List */}
                 <div className="space-y-4">
                     <h3 className="text-sm font-bold text-white print:text-black uppercase tracking-wider">
-                        Past Training Sessions
+                        Past Training Sessions ({logs.length})
                     </h3>
 
                     <div className="space-y-3">
                         {logs.map((log) => (
                             <div
                                 key={log.id}
-                                className="bg-[#141518] print:bg-zinc-50 border border-zinc-800/80 print:border-zinc-300 rounded-2xl p-5 shadow-lg space-y-4"
+                                className="bg-[#141518] print:bg-zinc-50 border border-zinc-800/80 print:border-zinc-300 rounded-2xl p-5 shadow-lg space-y-4 group relative"
                             >
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800/60 print:border-zinc-200 pb-3">
                                     <div className="flex items-center gap-3">
@@ -226,8 +581,17 @@ export default function WorkoutHistoryPage() {
                                             Duration: <strong className="text-white print:text-black">{log.durationMinutes}m</strong>
                                         </span>
                                         <span className="text-zinc-400 print:text-zinc-600">
-                                            Session Volume: <strong className="text-[#00ff87] print:text-emerald-700">{log.totalVolumeKg} kg</strong>
+                                            Volume: <strong className="text-[#00ff87] print:text-emerald-700">{log.totalVolumeKg} kg</strong>
                                         </span>
+
+                                        {/* Delete Past Session Button */}
+                                        <button
+                                            onClick={() => deletePastLog(log.id)}
+                                            className="print:hidden text-zinc-500 hover:text-red-400 p-1 rounded-lg transition-colors"
+                                            title="Delete this session entry"
+                                        >
+                                            🗑️
+                                        </button>
                                     </div>
                                 </div>
 
@@ -253,26 +617,26 @@ export default function WorkoutHistoryPage() {
                 </div>
             </div>
 
-            {/* Log Workout Modal */}
-            {showLogModal && (
+            {/* Manual Quick Log Modal */}
+            {showQuickLogModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 print:hidden">
                     <div className="bg-[#141518] border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
                         <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-                            <h3 className="text-base font-bold text-white">Log Training Session</h3>
+                            <h3 className="text-base font-bold text-white">Log Past Session Manually</h3>
                             <button
-                                onClick={() => setShowLogModal(false)}
+                                onClick={() => setShowQuickLogModal(false)}
                                 className="text-zinc-400 hover:text-white text-sm"
                             >
                                 ✕
                             </button>
                         </div>
 
-                        <form onSubmit={handleSaveWorkout} className="space-y-3.5 text-xs">
+                        <form onSubmit={handleManualQuickLog} className="space-y-3.5 text-xs">
                             <div>
                                 <label className="text-zinc-400 font-semibold block mb-1">Workout Split</label>
                                 <select
-                                    value={splitName}
-                                    onChange={(e) => setSplitName(e.target.value as any)}
+                                    value={manualSplit}
+                                    onChange={(e) => setManualSplit(e.target.value)}
                                     className="w-full bg-[#1b1c20] border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#00ff87]"
                                 >
                                     <option value="Push Day">Push Day (Chest, Shoulders, Triceps)</option>
@@ -284,12 +648,12 @@ export default function WorkoutHistoryPage() {
                             </div>
 
                             <div>
-                                <label className="text-zinc-400 font-semibold block mb-1">Primary Exercise Name</label>
+                                <label className="text-zinc-400 font-semibold block mb-1">Exercise Name</label>
                                 <input
                                     type="text"
                                     required
-                                    value={exerciseInput}
-                                    onChange={(e) => setExerciseInput(e.target.value)}
+                                    value={manualExercise}
+                                    onChange={(e) => setManualExercise(e.target.value)}
                                     className="w-full bg-[#1b1c20] border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#00ff87]"
                                 />
                             </div>
@@ -302,8 +666,8 @@ export default function WorkoutHistoryPage() {
                                         min="1"
                                         max="10"
                                         required
-                                        value={setsInput}
-                                        onChange={(e) => setSetsInput(parseInt(e.target.value) || 1)}
+                                        value={manualSets}
+                                        onChange={(e) => setManualSets(parseInt(e.target.value) || 1)}
                                         className="w-full bg-[#1b1c20] border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#00ff87]"
                                     />
                                 </div>
@@ -314,8 +678,8 @@ export default function WorkoutHistoryPage() {
                                         min="1"
                                         max="50"
                                         required
-                                        value={repsInput}
-                                        onChange={(e) => setRepsInput(parseInt(e.target.value) || 1)}
+                                        value={manualReps}
+                                        onChange={(e) => setManualReps(parseInt(e.target.value) || 1)}
                                         className="w-full bg-[#1b1c20] border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#00ff87]"
                                     />
                                 </div>
@@ -326,8 +690,8 @@ export default function WorkoutHistoryPage() {
                                         min="0"
                                         step="0.5"
                                         required
-                                        value={weightInput}
-                                        onChange={(e) => setWeightInput(parseFloat(e.target.value) || 0)}
+                                        value={manualWeight}
+                                        onChange={(e) => setManualWeight(parseFloat(e.target.value) || 0)}
                                         className="w-full bg-[#1b1c20] border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#00ff87]"
                                     />
                                 </div>
@@ -337,11 +701,11 @@ export default function WorkoutHistoryPage() {
                                 <label className="text-zinc-400 font-semibold block mb-1">Duration (minutes)</label>
                                 <input
                                     type="number"
-                                    min="10"
+                                    min="5"
                                     max="180"
                                     required
-                                    value={duration}
-                                    onChange={(e) => setDuration(parseInt(e.target.value) || 60)}
+                                    value={manualDuration}
+                                    onChange={(e) => setManualDuration(parseInt(e.target.value) || 60)}
                                     className="w-full bg-[#1b1c20] border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#00ff87]"
                                 />
                             </div>
@@ -349,7 +713,7 @@ export default function WorkoutHistoryPage() {
                             <div className="pt-3 flex gap-2 justify-end">
                                 <button
                                     type="button"
-                                    onClick={() => setShowLogModal(false)}
+                                    onClick={() => setShowQuickLogModal(false)}
                                     className="px-4 py-2 bg-[#1b1c20] hover:bg-[#25272e] text-zinc-300 rounded-xl font-semibold transition-colors"
                                 >
                                     Cancel
