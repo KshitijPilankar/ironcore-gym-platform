@@ -590,8 +590,11 @@ export default function WorkoutHistoryPage() {
 
                             <button
                                 onClick={togglePause}
-                                className={`w-20 h-14 rounded-2xl flex items-center justify-center text-2xl font-bold transition-all shadow-xl active:scale-95 ${isPaused ? "bg-[#00ff87] text-black shadow-[#00ff87]/30" : "bg-[#00e57a] text-black hover:bg-[#00ff87]"
-                                    }`}
+                                className={`w-20 h-14 rounded-2xl flex items-center justify-center text-2xl font-bold transition-all active:scale-95 ${
+                                    isPaused
+                                        ? "bg-[#00e57a] text-black font-black hover:bg-[#00ff87]"
+                                        : "bg-[#1b1d24] text-[#00ff87] border border-[#00ff87]/40 hover:bg-[#22252e]"
+                                }`}
                                 title={isPaused ? "Resume" : "Pause"}
                             >
                                 {isPaused ? "▶" : "⏸"}
@@ -618,7 +621,7 @@ export default function WorkoutHistoryPage() {
 
                             <button
                                 onClick={handleFinishAndSaveFinal}
-                                className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-[#00ff87] hover:bg-[#00e57a] text-black text-xs font-black transition-all shadow-lg shadow-[#00ff87]/25 flex items-center justify-center gap-2 active:scale-[0.98]"
+                                className="w-full sm:flex-1 bg-[#00ff87] hover:bg-[#00e57a] text-black text-xs font-black py-3 px-4 rounded-xl border border-[#00ff87]/50 transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
                             >
                                 <span>✓</span>
                                 <span>Complete & Log Final Session</span>
