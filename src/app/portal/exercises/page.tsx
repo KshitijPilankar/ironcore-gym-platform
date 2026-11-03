@@ -364,7 +364,7 @@ export default function ExerciseEnginePage() {
                         </div>
 
                         {/* Looping 3-Second Movement Video / Animation */}
-                        <div className="w-full h-80 sm:h-96 bg-[#0d0e11] rounded-2xl border border-zinc-800/80 overflow-hidden flex items-center justify-center relative shadow-inner">
+                        <div className="relative w-full aspect-square max-h-[360px] bg-[#0c0d10] rounded-2xl border border-zinc-800/80 flex items-center justify-center p-2 overflow-hidden shadow-inner">
                             {activeModalExercise.gif ? (
                                 <video
                                     src={`/api/media/clip/${activeModalExercise.gif}`}
@@ -373,19 +373,31 @@ export default function ExerciseEnginePage() {
                                     loop
                                     muted
                                     playsInline
-                                    className="w-full h-full object-contain scale-125 will-change-transform"
+                                    className="w-full h-full object-contain pointer-events-none"
+                                    style={{
+                                        imageRendering: "crisp-edges",
+                                        filter: "contrast(1.15) saturate(1.15) brightness(1.02)",
+                                        WebkitBackfaceVisibility: "hidden",
+                                        transform: "translateZ(0)",
+                                    }}
                                 />
                             ) : activeModalExercise.img ? (
                                 <img
                                     src={`/api/media/still/${activeModalExercise.img}`}
                                     alt={activeModalExercise.n}
-                                    className="w-full h-full object-contain scale-125 will-change-transform"
+                                    className="w-full h-full object-contain pointer-events-none"
+                                    style={{
+                                        imageRendering: "crisp-edges",
+                                        filter: "contrast(1.15) saturate(1.15) brightness(1.02)",
+                                        WebkitBackfaceVisibility: "hidden",
+                                        transform: "translateZ(0)",
+                                    }}
                                 />
                             ) : (
                                 <span className="text-zinc-500 text-xs">No media available</span>
                             )}
 
-                            <span className="absolute bottom-3 left-3 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-black/80 text-zinc-300 backdrop-blur-sm border border-zinc-800 flex items-center gap-1 z-10">
+                            <span className="absolute bottom-3 left-3 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-black/80 text-zinc-300 backdrop-blur-sm border border-zinc-800 flex items-center gap-1 z-10 pointer-events-none">
                                 <span className="w-1.5 h-1.5 rounded-full bg-[#00ff87] animate-pulse" />
                                 Looping Vector Execution
                             </span>
