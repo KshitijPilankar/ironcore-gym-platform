@@ -206,10 +206,11 @@ export default function MemberPortalDashboard() {
                         <button
                             onClick={handleDailyCheckIn}
                             disabled={hasCheckedInToday}
-                            className={`w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg ${hasCheckedInToday
+                            className={`w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg ${
+                                hasCheckedInToday
                                     ? "bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700/50"
                                     : "bg-[#00ff87] hover:bg-[#00e57a] text-black shadow-[#00ff87]/20 active:scale-95 cursor-pointer"
-                                }`}
+                            }`}
                         >
                             <span>{hasCheckedInToday ? "✓" : "⚡"}</span>
                             <span>{hasCheckedInToday ? "Checked In Today" : "Check In At Gym"}</span>
@@ -317,8 +318,8 @@ export default function MemberPortalDashboard() {
                     </div>
                 </div>
 
-                {/* Feature Hub Navigation: Muscle Heatmap & Exercises */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                {/* Feature Hub Navigation: Muscle Heatmap, Exercises & Workout History */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                     <div className="bg-[#141518] border border-zinc-800/80 rounded-xl p-5 flex items-center justify-between hover:border-[#00ff87]/40 transition-all group">
                         <div>
                             <span className="text-xl">🧬</span>
@@ -352,6 +353,24 @@ export default function MemberPortalDashboard() {
                             className="bg-[#1b1c20] group-hover:bg-[#00ff87] group-hover:text-black border border-zinc-800 text-zinc-300 font-semibold text-xs px-3.5 py-2 rounded-lg transition-all"
                         >
                             Explore →
+                        </Link>
+                    </div>
+
+                    <div className="bg-[#141518] border border-zinc-800/80 rounded-xl p-5 flex items-center justify-between hover:border-[#00ff87]/40 transition-all group">
+                        <div>
+                            <span className="text-xl">📄</span>
+                            <h4 className="text-sm font-bold text-white mt-1 group-hover:text-[#00ff87] transition-colors">
+                                Workout History & PDF Reports
+                            </h4>
+                            <p className="text-xs text-zinc-500 mt-0.5">
+                                Review past sessions, progressive volume overload, and print performance reports.
+                            </p>
+                        </div>
+                        <Link
+                            href="/portal/history"
+                            className="bg-[#1b1c20] group-hover:bg-[#00ff87] group-hover:text-black border border-zinc-800 text-zinc-300 font-semibold text-xs px-3.5 py-2 rounded-lg transition-all"
+                        >
+                            History →
                         </Link>
                     </div>
                 </div>
