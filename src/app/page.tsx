@@ -41,15 +41,16 @@ export default function GymHomePage() {
             </span>
           </div>
 
+          {/* Secure Login Gateways */}
           <div className="flex items-center gap-4">
             <Link
-              href="/portal"
+              href="/login"
               className="text-xs sm:text-sm font-semibold text-neutral-300 hover:text-white transition flex items-center gap-1.5 bg-neutral-900 border border-neutral-800 px-3.5 py-1.5 rounded-full hover:border-emerald-500/40"
             >
               <Smartphone className="w-4 h-4 text-emerald-400" /> Member App
             </Link>
             <Link
-              href="/admin"
+              href="/admin/login"
               className="text-xs sm:text-sm font-semibold bg-emerald-500 hover:bg-emerald-400 text-black px-4 py-1.5 rounded-full transition shadow-md shadow-emerald-500/20"
             >
               Owner Portal
