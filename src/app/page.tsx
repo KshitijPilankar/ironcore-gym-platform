@@ -42,17 +42,15 @@ export default function GymHomePage() {
           </div>
 
           <div className="flex items-center gap-4">
-            <a
-              href="http://localhost:8080"
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs sm:text-sm font-semibold text-neutral-300 hover:text-white transition flex items-center gap-1 bg-neutral-900 border border-neutral-800 px-3 py-1.5 rounded-full"
+            <Link
+              href="/portal"
+              className="text-xs sm:text-sm font-semibold text-neutral-300 hover:text-white transition flex items-center gap-1.5 bg-neutral-900 border border-neutral-800 px-3.5 py-1.5 rounded-full hover:border-emerald-500/40"
             >
               <Smartphone className="w-4 h-4 text-emerald-400" /> Member App
-            </a>
+            </Link>
             <Link
               href="/admin"
-              className="text-xs sm:text-sm font-semibold bg-emerald-500 hover:bg-emerald-400 text-black px-4 py-1.5 rounded-full transition"
+              className="text-xs sm:text-sm font-semibold bg-emerald-500 hover:bg-emerald-400 text-black px-4 py-1.5 rounded-full transition shadow-md shadow-emerald-500/20"
             >
               Owner Portal
             </Link>
@@ -151,29 +149,38 @@ export default function GymHomePage() {
       {/* App Integration Showcase */}
       <section className="px-6 py-16 border-t border-neutral-900 bg-neutral-950/50">
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800 hover:border-emerald-500/40 transition">
-            <Smartphone className="w-8 h-8 text-emerald-400 mb-4" />
-            <h3 className="font-bold text-lg">5,600+ Exercise Engine</h3>
+          <Link
+            href="/portal/exercises"
+            className="p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800 hover:border-emerald-500/40 transition block group"
+          >
+            <Smartphone className="w-8 h-8 text-emerald-400 mb-4 group-hover:scale-110 transition-transform" />
+            <h3 className="font-bold text-lg text-white group-hover:text-emerald-400 transition-colors">5,600+ Exercise Engine</h3>
             <p className="text-neutral-400 text-xs sm:text-sm mt-2">
               Cannot afford a Personal Trainer? Our official member app guides your form, sets, reps, and plate math live during your workout.
             </p>
-          </div>
+          </Link>
 
-          <div className="p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800 hover:border-emerald-500/40 transition">
-            <Flame className="w-8 h-8 text-amber-400 mb-4" />
-            <h3 className="font-bold text-lg">Snapchat-Style Streaks</h3>
+          <Link
+            href="/portal"
+            className="p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800 hover:border-emerald-500/40 transition block group"
+          >
+            <Flame className="w-8 h-8 text-amber-400 mb-4 group-hover:scale-110 transition-transform" />
+            <h3 className="font-bold text-lg text-white group-hover:text-amber-400 transition-colors">Snapchat-Style Streaks</h3>
             <p className="text-neutral-400 text-xs sm:text-sm mt-2">
               Log your daily check-in. Maintain your 30-day workout streak on the gym leaderboard and win free supplements every month.
             </p>
-          </div>
+          </Link>
 
-          <div className="p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800 hover:border-emerald-500/40 transition">
-            <Trophy className="w-8 h-8 text-cyan-400 mb-4" />
-            <h3 className="font-bold text-lg">Muscle Balance Map</h3>
+          <Link
+            href="/portal/stats"
+            className="p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800 hover:border-emerald-500/40 transition block group"
+          >
+            <Trophy className="w-8 h-8 text-cyan-400 mb-4 group-hover:scale-110 transition-transform" />
+            <h3 className="font-bold text-lg text-white group-hover:text-cyan-400 transition-colors">Muscle Balance Map</h3>
             <p className="text-neutral-400 text-xs sm:text-sm mt-2">
               Watch your personal 3D muscle heatmap light up as you complete sets. Target weak muscles before injury strikes.
             </p>
-          </div>
+          </Link>
         </div>
       </section>
 
