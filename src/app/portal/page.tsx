@@ -451,7 +451,7 @@ export default function MemberPortalDashboard() {
                     </div>
                 </div>
 
-                {/* 4-Column Feature Hub Navigation */}
+                {/* 4-Column Feature Hub Navigation: Uniform Styling across all 4 cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
                     {/* Card 1: 3D Muscle Volume Heatmap */}
                     <div className="bg-[#141518] border border-zinc-800/80 rounded-xl p-5 flex flex-col justify-between hover:border-[#00ff87]/40 transition-all group">
@@ -516,8 +516,8 @@ export default function MemberPortalDashboard() {
                         </div>
                     </div>
 
-                    {/* Card 4: Coach & Desk Support (Routes Directly to /portal/support) */}
-                    <div className="bg-[#141518] border border-zinc-800/80 rounded-xl p-5 flex flex-col justify-between hover:border-[#00ff87]/40 transition-all group border-l-4 border-l-[#00ff87]">
+                    {/* Card 4: Coach & Desk Support (Consistent structure & smooth hover matching Cards 1-3) */}
+                    <div className="bg-[#141518] border border-zinc-800/80 rounded-xl p-5 flex flex-col justify-between hover:border-[#00ff87]/40 transition-all group">
                         <div>
                             <span className="text-xl">💬</span>
                             <h4 className="text-sm font-bold text-white mt-2 group-hover:text-[#00ff87] transition-colors">
@@ -530,9 +530,9 @@ export default function MemberPortalDashboard() {
                         <div className="pt-4">
                             <Link
                                 href="/portal/support"
-                                className="inline-block w-full text-center bg-[#00ff87] hover:bg-[#00e57a] text-black font-extrabold text-xs py-2 rounded-lg transition-all shadow-md shadow-[#00ff87]/20"
+                                className="inline-block w-full text-center bg-[#1b1c20] group-hover:bg-[#00ff87] group-hover:text-black border border-zinc-800 text-zinc-300 font-semibold text-xs py-2 rounded-lg transition-all"
                             >
-                                Open Full Chat →
+                                Open Chat →
                             </Link>
                         </div>
                     </div>
