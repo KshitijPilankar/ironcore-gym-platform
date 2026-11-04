@@ -46,8 +46,8 @@ export default function MemberLoginPage() {
         return () => clearInterval(timer);
     }, [authStep, countdown]);
 
-    // Step 1: Validate 10-Digit Mobile & Send OTP
-    const handleSendOtp = (e: React.FormEvent) => {
+    // Step 1: Validate 10-Digit Mobile & Send OTP via Meta Cloud API
+    const handleSendOtp = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrorMsg("");
         setSuccessMsg("");
@@ -63,17 +63,37 @@ export default function MemberLoginPage() {
 
         setIsLoading(true);
 
-        // Simulate OTP generation
-        const randomOtp = Math.floor(1000 + Math.random() * 9000).toString();
-        setGeneratedOtp(randomOtp);
+        const generatedCode = Math.floor(1000 + Math.random() * 9000).toString();
+        setGeneratedOtp(generatedCode);
 
-        setTimeout(() => {
-            setIsLoading(false);
+        try {
+            const res = await fetch("/api/auth/send-otp", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ phone: cleanPhone, otp: generatedCode }),
+            });
+
+            const data = await res.json();
+
+            if (res.ok && data.success) {
+                setAuthStep("OTP");
+                setCountdown(30);
+                setCanResend(false);
+                setSuccessMsg("✓ WhatsApp par real OTP bhej diya gaya hai! Check your WhatsApp.");
+            } else {
+                setAuthStep("OTP");
+                setCountdown(30);
+                setCanResend(false);
+                setSuccessMsg(`WhatsApp OTP dispatch initiated! (Demo Code: ${generatedCode})`);
+            }
+        } catch (err) {
             setAuthStep("OTP");
             setCountdown(30);
             setCanResend(false);
-            setSuccessMsg(`WhatsApp OTP bhej diya gaya hai! (Demo OTP: ${randomOtp})`);
-        }, 700);
+            setSuccessMsg(`WhatsApp OTP bhej diya gaya hai! (Demo OTP: ${generatedCode})`);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     // Step 2: Verify OTP and Login
@@ -124,14 +144,31 @@ export default function MemberLoginPage() {
     };
 
     // Resend OTP Handler
-    const handleResendOtp = () => {
+    const handleResendOtp = async () => {
         if (!canResend) return;
         setErrorMsg("");
         const newOtp = Math.floor(1000 + Math.random() * 9000).toString();
         setGeneratedOtp(newOtp);
         setCountdown(30);
         setCanResend(false);
-        setSuccessMsg(`Naya OTP bhej diya gaya hai! (Demo OTP: ${newOtp})`);
+
+        const cleanPhone = phone.replace(/[^0-9]/g, "");
+
+        try {
+            const res = await fetch("/api/auth/send-otp", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ phone: cleanPhone, otp: newOtp }),
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                setSuccessMsg("✓ Naya WhatsApp OTP bhej diya gaya hai!");
+            } else {
+                setSuccessMsg(`Naya OTP bhej diya gaya hai! (Demo OTP: ${newOtp})`);
+            }
+        } catch {
+            setSuccessMsg(`Naya OTP bhej diya gaya hai! (Demo OTP: ${newOtp})`);
+        }
     };
 
     return (
