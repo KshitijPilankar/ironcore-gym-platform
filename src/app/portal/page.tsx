@@ -139,7 +139,7 @@ export default function MemberPortalDashboard() {
         }
     }, [chatMessages, isChatOpen]);
 
-    // 2. Daily Check-in Handler (Syncs streak to localStorage & Admin CRM)
+    // 2. Daily Check-in Handler
     const handleDailyCheckIn = () => {
         if (!member) return;
 
@@ -155,7 +155,6 @@ export default function MemberPortalDashboard() {
         setHasCheckedInToday(true);
         localStorage.setItem("ironcore_last_checkin_date", today);
 
-        // Sync with CRM storage so admin sees the updated streak
         const storedMembers = localStorage.getItem("ironcore_members_db");
         if (storedMembers) {
             try {
@@ -245,7 +244,6 @@ export default function MemberPortalDashboard() {
         setChatMessages(updatedMessages);
         setChatInput("");
 
-        // Sync with CRM chat roster in localStorage so admin sees incoming message
         const savedRoster = localStorage.getItem("ironcore_crm_chat_roster");
         if (savedRoster) {
             try {
@@ -269,7 +267,6 @@ export default function MemberPortalDashboard() {
             }
         }
 
-        // Simulate instant coach acknowledgment after 1 second if only 1-2 messages exist
         setTimeout(() => {
             const replyMsg: ChatMessage = {
                 id: `reply-${Date.now()}`,
@@ -344,11 +341,10 @@ export default function MemberPortalDashboard() {
                         <button
                             onClick={handleDailyCheckIn}
                             disabled={hasCheckedInToday}
-                            className={`w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg ${
-                                hasCheckedInToday
+                            className={`w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg ${hasCheckedInToday
                                     ? "bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700/50"
                                     : "bg-[#00ff87] hover:bg-[#00e57a] text-black shadow-[#00ff87]/20 active:scale-95 cursor-pointer"
-                            }`}
+                                }`}
                         >
                             <span>{hasCheckedInToday ? "✓" : "⚡"}</span>
                             <span>{hasCheckedInToday ? "Checked In Today" : "Check In At Gym"}</span>
@@ -356,7 +352,7 @@ export default function MemberPortalDashboard() {
                     </div>
                 </div>
 
-                {/* openGym Metric Modules: Target Weight & Log Weight */}
+                {/* Metric Modules: Target Weight & Log Weight */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Target Weight Goal Module */}
                     <div className="bg-[#141518] border border-zinc-800/80 rounded-2xl p-6 space-y-5">
@@ -399,7 +395,7 @@ export default function MemberPortalDashboard() {
 
                         <button
                             onClick={handleSaveGoal}
-                            className="w-full bg-[#1b1c20] hover:bg-[#25272e] border border-zinc-800 text-zinc-200 font-semibold text-xs py-2.5 rounded-xl transition-all"
+                            className="w-full bg-[#1b1c20] hover:bg-[#25272e] border border-zinc-800 text-zinc-200 font-semibold text-xs py-2.5 rounded-xl transition-all cursor-pointer"
                         >
                             Save Target Goal
                         </button>
@@ -428,13 +424,12 @@ export default function MemberPortalDashboard() {
                             />
                             <button
                                 type="submit"
-                                className="bg-[#00ff87] hover:bg-[#00e57a] text-black font-semibold text-xs px-4 py-2.5 rounded-xl transition-all shadow-md shadow-[#00ff87]/20"
+                                className="bg-[#00ff87] hover:bg-[#00e57a] text-black font-semibold text-xs px-4 py-2.5 rounded-xl transition-all shadow-md shadow-[#00ff87]/20 cursor-pointer"
                             >
                                 Log Entry
                             </button>
                         </form>
 
-                        {/* Recent Log History List */}
                         <div className="space-y-2 pt-1">
                             <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
                                 Recent Weigh-ins
@@ -456,7 +451,7 @@ export default function MemberPortalDashboard() {
                     </div>
                 </div>
 
-                {/* 4-Column Feature Hub Navigation: Heatmap, Exercises, History & Coach Support */}
+                {/* 4-Column Feature Hub Navigation */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
                     {/* Card 1: 3D Muscle Volume Heatmap */}
                     <div className="bg-[#141518] border border-zinc-800/80 rounded-xl p-5 flex flex-col justify-between hover:border-[#00ff87]/40 transition-all group">
@@ -521,8 +516,8 @@ export default function MemberPortalDashboard() {
                         </div>
                     </div>
 
-                    {/* Card 4: Coach & Desk Support */}
-                    <div className="bg-[#141518] border border-zinc-800/80 rounded-xl p-5 flex flex-col justify-between hover:border-[#00ff87]/40 transition-all group">
+                    {/* Card 4: Coach & Desk Support (Routes Directly to /portal/support) */}
+                    <div className="bg-[#141518] border border-zinc-800/80 rounded-xl p-5 flex flex-col justify-between hover:border-[#00ff87]/40 transition-all group border-l-4 border-l-[#00ff87]">
                         <div>
                             <span className="text-xl">💬</span>
                             <h4 className="text-sm font-bold text-white mt-2 group-hover:text-[#00ff87] transition-colors">
@@ -533,12 +528,12 @@ export default function MemberPortalDashboard() {
                             </p>
                         </div>
                         <div className="pt-4">
-                            <button
-                                onClick={() => setIsChatOpen(true)}
-                                className="w-full text-center bg-[#1b1c20] group-hover:bg-[#00ff87] group-hover:text-black border border-zinc-800 text-zinc-300 font-semibold text-xs py-2 rounded-lg transition-all"
+                            <Link
+                                href="/portal/support"
+                                className="inline-block w-full text-center bg-[#00ff87] hover:bg-[#00e57a] text-black font-extrabold text-xs py-2 rounded-lg transition-all shadow-md shadow-[#00ff87]/20"
                             >
-                                Open Chat →
-                            </button>
+                                Open Full Chat →
+                            </Link>
                         </div>
                     </div>
                 </div>
@@ -570,13 +565,22 @@ export default function MemberPortalDashboard() {
                             </div>
                         </div>
 
-                        <button
-                            onClick={() => setIsChatOpen(false)}
-                            className="w-8 h-8 rounded-xl bg-[#1f222b] hover:bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center text-sm font-bold transition-colors"
-                            title="Close chat drawer"
-                        >
-                            ✕
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <Link
+                                href="/portal/support"
+                                className="text-[10px] text-[#00ff87] hover:underline font-semibold"
+                                title="Expand to full screen"
+                            >
+                                Full Screen ↗
+                            </Link>
+                            <button
+                                onClick={() => setIsChatOpen(false)}
+                                className="w-8 h-8 rounded-xl bg-[#1f222b] hover:bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center text-sm font-bold transition-colors cursor-pointer"
+                                title="Close chat drawer"
+                            >
+                                ✕
+                            </button>
+                        </div>
                     </div>
 
                     {/* Direct WhatsApp Quick Launch Banner */}
@@ -611,17 +615,15 @@ export default function MemberPortalDashboard() {
                                     className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
                                 >
                                     <div
-                                        className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs shadow-md leading-relaxed ${
-                                            isMe
+                                        className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs shadow-md leading-relaxed ${isMe
                                                 ? "bg-[#00ff87]/20 border border-[#00ff87]/40 text-emerald-100 rounded-tr-xs"
                                                 : "bg-[#1b1d24] border border-zinc-800 text-zinc-200 rounded-tl-xs"
-                                        }`}
+                                            }`}
                                     >
                                         <p>{msg.text}</p>
                                         <div
-                                            className={`text-[9px] font-mono mt-1 text-right ${
-                                                isMe ? "text-[#00ff87]/80" : "text-zinc-500"
-                                            }`}
+                                            className={`text-[9px] font-mono mt-1 text-right ${isMe ? "text-[#00ff87]/80" : "text-zinc-500"
+                                                }`}
                                         >
                                             {msg.timestamp} {isMe && "✓✓"}
                                         </div>
@@ -636,19 +638,19 @@ export default function MemberPortalDashboard() {
                     <div className="px-3 py-2 bg-[#14161c] border-t border-zinc-800/80 flex items-center gap-1.5 overflow-x-auto scrollbar-none text-[10px]">
                         <button
                             onClick={() => setChatInput("Can I freeze my membership next week?")}
-                            className="px-2.5 py-1 rounded-lg bg-[#1e2028] hover:bg-[#272a35] text-zinc-300 border border-zinc-700/60 whitespace-nowrap"
+                            className="px-2.5 py-1 rounded-lg bg-[#1e2028] hover:bg-[#272a35] text-zinc-300 border border-zinc-700/60 whitespace-nowrap cursor-pointer"
                         >
                             ❄️ Freeze Membership
                         </button>
                         <button
                             onClick={() => setChatInput("Need advice on my daily protein intake.")}
-                            className="px-2.5 py-1 rounded-lg bg-[#1e2028] hover:bg-[#272a35] text-zinc-300 border border-zinc-700/60 whitespace-nowrap"
+                            className="px-2.5 py-1 rounded-lg bg-[#1e2028] hover:bg-[#272a35] text-zinc-300 border border-zinc-700/60 whitespace-nowrap cursor-pointer"
                         >
                             🥗 Protein Guidance
                         </button>
                         <button
                             onClick={() => setChatInput("When does my Smart Pass renew?")}
-                            className="px-2.5 py-1 rounded-lg bg-[#1e2028] hover:bg-[#272a35] text-zinc-300 border border-zinc-700/60 whitespace-nowrap"
+                            className="px-2.5 py-1 rounded-lg bg-[#1e2028] hover:bg-[#272a35] text-zinc-300 border border-zinc-700/60 whitespace-nowrap cursor-pointer"
                         >
                             💳 Renewal Query
                         </button>
@@ -667,7 +669,7 @@ export default function MemberPortalDashboard() {
                             <button
                                 type="submit"
                                 disabled={!chatInput.trim()}
-                                className="bg-[#00ff87] hover:bg-[#00e57a] disabled:opacity-40 text-black font-extrabold text-xs px-3.5 py-2 rounded-xl transition-all shadow-md active:scale-95"
+                                className="bg-[#00ff87] hover:bg-[#00e57a] disabled:opacity-40 text-black font-extrabold text-xs px-3.5 py-2 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"
                             >
                                 ➤
                             </button>
@@ -679,7 +681,7 @@ export default function MemberPortalDashboard() {
             {/* Neon Green Floating Action Button */}
             <button
                 onClick={() => setIsChatOpen(!isChatOpen)}
-                className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-[#00ff87] hover:bg-[#00e57a] text-black shadow-2xl shadow-[#00ff87]/30 flex items-center justify-center transition-all active:scale-95 group border-2 border-black"
+                className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-[#00ff87] hover:bg-[#00e57a] text-black shadow-2xl shadow-[#00ff87]/30 flex items-center justify-center transition-all active:scale-95 group border-2 border-black cursor-pointer"
                 title="Chat with Gym / Coach"
             >
                 {/* Unread Indicator Dot */}
