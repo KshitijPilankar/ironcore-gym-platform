@@ -22,9 +22,9 @@ export default function MemberLoginPage() {
     const [authStep, setAuthStep] = useState<"PHONE" | "OTP">("PHONE");
 
     // Inputs
-    const [phone, setPhone] = useState("");
+    const [phone, setPhone] = useState("9004884885");
     const [otpInput, setOtpInput] = useState("");
-    const [generatedOtp, setGeneratedOtp] = useState("");
+    const [sentOtp, setSentOtp] = useState("");
 
     // UI state
     const [errorMsg, setErrorMsg] = useState("");
@@ -46,7 +46,7 @@ export default function MemberLoginPage() {
         return () => clearInterval(timer);
     }, [authStep, countdown]);
 
-    // Step 1: Validate 10-Digit Mobile & Send OTP via Meta Cloud API
+    // Step 1: Validate 10-Digit Mobile & Send Real WhatsApp OTP
     const handleSendOtp = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrorMsg("");
@@ -64,7 +64,7 @@ export default function MemberLoginPage() {
         setIsLoading(true);
 
         const generatedCode = Math.floor(1000 + Math.random() * 9000).toString();
-        setGeneratedOtp(generatedCode);
+        setSentOtp(generatedCode);
 
         try {
             const res = await fetch("/api/auth/send-otp", {
@@ -79,24 +79,18 @@ export default function MemberLoginPage() {
                 setAuthStep("OTP");
                 setCountdown(30);
                 setCanResend(false);
-                setSuccessMsg("✓ WhatsApp par real OTP bhej diya gaya hai! Check your WhatsApp.");
+                setSuccessMsg("✓ WhatsApp par real OTP code bhej diya gaya hai! Chat check karein.");
             } else {
-                setAuthStep("OTP");
-                setCountdown(30);
-                setCanResend(false);
-                setSuccessMsg(`WhatsApp OTP dispatch initiated! (Demo Code: ${generatedCode})`);
+                setErrorMsg(data.error || "Meta WhatsApp se message bhejne me dikkat aayi.");
             }
-        } catch (err) {
-            setAuthStep("OTP");
-            setCountdown(30);
-            setCanResend(false);
-            setSuccessMsg(`WhatsApp OTP bhej diya gaya hai! (Demo OTP: ${generatedCode})`);
+        } catch {
+            setErrorMsg("Backend server tak request nahi pahunch saki. Terminal check karein.");
         } finally {
             setIsLoading(false);
         }
     };
 
-    // Step 2: Verify OTP and Login
+    // Step 2: Verify Real OTP and Login
     const handleVerifyOtp = (e: React.FormEvent) => {
         e.preventDefault();
         setErrorMsg("");
@@ -105,8 +99,8 @@ export default function MemberLoginPage() {
         const cleanPhone = phone.replace(/[^0-9]/g, "");
 
         setTimeout(() => {
-            if (otpInput === generatedOtp || otpInput === "1234") {
-                // Find existing CRM member or initialize session
+            // Verify against actual sent code or master development override
+            if (otpInput === sentOtp || otpInput === "1234") {
                 const storedMembers = localStorage.getItem("ironcore_members_db");
                 let membersList: Member[] = [];
 
@@ -124,7 +118,7 @@ export default function MemberLoginPage() {
 
                 const activeUser: Member = matchedMember || {
                     id: `mem-${Date.now()}`,
-                    name: cleanPhone.endsWith("43209") ? "Kshitij Pilankar" : "Athlete Member",
+                    name: cleanPhone.endsWith("84885") ? "Kshitij Pilankar" : "Athlete Member",
                     phone: `91${cleanPhone}`,
                     plan: "Smart Pass",
                     dueDate: "2026-11-20",
@@ -137,20 +131,20 @@ export default function MemberLoginPage() {
 
                 router.push("/portal");
             } else {
-                setErrorMsg("Galat OTP! Kripya sahi 4-digit OTP enter karein.");
+                setErrorMsg("Galat OTP! Kripya WhatsApp par aaya hua 4-digit code enter karein.");
                 setIsLoading(false);
             }
-        }, 600);
+        }, 500);
     };
 
-    // Resend OTP Handler
+    // Resend Real OTP Handler
     const handleResendOtp = async () => {
         if (!canResend) return;
         setErrorMsg("");
+        setIsLoading(true);
+
         const newOtp = Math.floor(1000 + Math.random() * 9000).toString();
-        setGeneratedOtp(newOtp);
-        setCountdown(30);
-        setCanResend(false);
+        setSentOtp(newOtp);
 
         const cleanPhone = phone.replace(/[^0-9]/g, "");
 
@@ -162,12 +156,16 @@ export default function MemberLoginPage() {
             });
             const data = await res.json();
             if (res.ok && data.success) {
-                setSuccessMsg("✓ Naya WhatsApp OTP bhej diya gaya hai!");
+                setCountdown(30);
+                setCanResend(false);
+                setSuccessMsg("✓ Naya WhatsApp OTP deliver ho gaya hai!");
             } else {
-                setSuccessMsg(`Naya OTP bhej diya gaya hai! (Demo OTP: ${newOtp})`);
+                setErrorMsg(data.error || "Resend failed.");
             }
         } catch {
-            setSuccessMsg(`Naya OTP bhej diya gaya hai! (Demo OTP: ${newOtp})`);
+            setErrorMsg("Network error during resend.");
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -202,21 +200,21 @@ export default function MemberLoginPage() {
                     </h1>
                     <p className="text-xs text-zinc-400">
                         {authStep === "PHONE"
-                            ? "Apna registered 10-digit WhatsApp number enter karke OTP mangwayein."
+                            ? "Apna registered 10-digit WhatsApp number enter karke real OTP mangwayein."
                             : `+91 ${phone} par bheja gaya 4-digit verification code enter karein.`}
                     </p>
                 </div>
 
                 {/* Error Alert */}
                 {errorMsg && (
-                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold text-center">
+                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold text-center leading-relaxed">
                         {errorMsg}
                     </div>
                 )}
 
-                {/* Success / Demo OTP Alert */}
+                {/* Success Alert */}
                 {successMsg && (
-                    <div className="p-3 rounded-xl bg-[#00ff87]/10 border border-[#00ff87]/30 text-[#00ff87] text-xs font-semibold text-center">
+                    <div className="p-3 rounded-xl bg-[#00ff87]/10 border border-[#00ff87]/30 text-[#00ff87] text-xs font-semibold text-center leading-relaxed">
                         {successMsg}
                     </div>
                 )}
@@ -236,7 +234,7 @@ export default function MemberLoginPage() {
                                     type="tel"
                                     maxLength={10}
                                     required
-                                    placeholder="9876543210"
+                                    placeholder="9004884885"
                                     value={phone}
                                     onChange={(e) => {
                                         const onlyNums = e.target.value.replace(/[^0-9]/g, "");
@@ -246,7 +244,7 @@ export default function MemberLoginPage() {
                                 />
                             </div>
                             <span className="text-[11px] text-zinc-500 font-mono mt-1 block">
-                                Exactly 10 digits required (Starting with 6, 7, 8, ya 9)
+                                Verified number: 9004884885
                             </span>
                         </div>
 
@@ -255,7 +253,7 @@ export default function MemberLoginPage() {
                             disabled={isLoading || phone.length !== 10}
                             className="w-full py-3.5 rounded-xl bg-[#00ff87] hover:bg-[#00e57a] disabled:opacity-40 disabled:cursor-not-allowed text-black font-black text-xs uppercase tracking-wider transition-all shadow-md shadow-[#00ff87]/20 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
                         >
-                            {isLoading ? "Verifying Number..." : "Send WhatsApp OTP →"}
+                            {isLoading ? "Connecting to Meta API..." : "Send WhatsApp OTP →"}
                         </button>
                     </form>
                 )}
@@ -276,7 +274,7 @@ export default function MemberLoginPage() {
                                         setErrorMsg("");
                                         setSuccessMsg("");
                                     }}
-                                    className="text-[11px] text-[#00ff87] hover:underline font-semibold"
+                                    className="text-[11px] text-[#00ff87] hover:underline font-semibold cursor-pointer"
                                 >
                                     Edit Number ✎
                                 </button>
@@ -302,19 +300,19 @@ export default function MemberLoginPage() {
                             disabled={isLoading || otpInput.length !== 4}
                             className="w-full py-3.5 rounded-xl bg-[#00ff87] hover:bg-[#00e57a] disabled:opacity-40 disabled:cursor-not-allowed text-black font-black text-xs uppercase tracking-wider transition-all shadow-md shadow-[#00ff87]/20 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
                         >
-                            {isLoading ? "Validating OTP..." : "Verify & Sign In →"}
+                            {isLoading ? "Validating Code..." : "Verify & Sign In →"}
                         </button>
 
                         {/* Resend Section */}
                         <div className="pt-2 flex items-center justify-between text-[11px] font-mono text-zinc-400">
-                            <span>Didn't receive OTP?</span>
+                            <span>Didn't receive WhatsApp text?</span>
                             {canResend ? (
                                 <button
                                     type="button"
                                     onClick={handleResendOtp}
                                     className="text-[#00ff87] font-bold hover:underline cursor-pointer"
                                 >
-                                    Resend OTP
+                                    Resend WhatsApp OTP
                                 </button>
                             ) : (
                                 <span className="text-zinc-500">Resend in {countdown}s</span>
@@ -342,7 +340,7 @@ export default function MemberLoginPage() {
             </div>
 
             <div className="text-center text-xs text-zinc-600 font-mono">
-                IronCore Access Management • OTP Guard v2.4
+                IronCore Access Management • Meta Business Platform v20.0
             </div>
         </div>
     );
