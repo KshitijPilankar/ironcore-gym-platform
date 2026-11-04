@@ -17,7 +17,7 @@ const DEFAULT_MEMBERS: Member[] = [
     {
         id: "0",
         name: "Kshitij Pilankar",
-        phone: "919876543209",
+        phone: "919004884885",
         plan: "Smart Pass",
         dueDate: "2026-11-12",
         streakDays: 12,
@@ -74,8 +74,12 @@ export default function GymAdminDashboard() {
     const [members, setMembers] = useState<Member[]>(DEFAULT_MEMBERS);
     const [searchQuery, setSearchQuery] = useState("");
     const [sendingId, setSendingId] = useState<string | null>(null);
+    const [sentId, setSentId] = useState<string | null>(null);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [reminderModalMember, setReminderModalMember] = useState<Member | null>(null);
+    const [feedbackToast, setFeedbackToast] = useState<{
+        type: "success" | "error";
+        text: string;
+    } | null>(null);
     const [isMounted, setIsMounted] = useState(false);
 
     // Form State
@@ -117,10 +121,13 @@ export default function GymAdminDashboard() {
             return;
         }
 
+        const cleanPhone = newMember.phone.replace(/[^0-9]/g, "");
+        const formattedPhone = cleanPhone.startsWith("91") ? cleanPhone : `91${cleanPhone}`;
+
         const memberToAdd: Member = {
             id: Date.now().toString(),
             name: newMember.name.trim(),
-            phone: newMember.phone.trim(),
+            phone: formattedPhone,
             plan: newMember.plan,
             dueDate: newMember.dueDate,
             streakDays: Number(newMember.streakDays) || 1,
@@ -141,42 +148,55 @@ export default function GymAdminDashboard() {
         setIsAddModalOpen(false);
     };
 
-    // 4. Meta Cloud API Send Reminder Trigger
-    const sendWhatsAppReminder = async (member: Member) => {
+    // 4. Meta Cloud API Personalized Dynamic WhatsApp Reminder Trigger
+    const handleDirectSendReminder = async (member: Member) => {
         setSendingId(member.id);
+        setFeedbackToast(null);
 
         try {
-            const res = await fetch("/api/send-reminder", {
+            const res = await fetch("/api/whatsapp/send-reminder", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
+                    name: member.name,
                     phone: member.phone,
-                    memberName: member.name,
-                    dueDate: member.dueDate,
                     plan: member.plan,
+                    dueDate: member.dueDate,
                     streakDays: member.streakDays,
+                    amount: member.plan === "Smart Pass" ? "1,999" : "1,499",
                 }),
             });
 
             const data = await res.json();
 
             if (res.ok && data.success) {
-                alert(`✅ Meta Cloud API: Reminder successfully sent to ${member.name}!`);
+                setSentId(member.id);
+                setFeedbackToast({
+                    type: "success",
+                    text: `✓ Personalized renewal reminder WhatsApp par bhej diya gaya: ${member.name} (+${member.phone})`,
+                });
+                setTimeout(() => setSentId(null), 4000);
             } else {
-                alert(`❌ Send failed: ${data.error || "Unknown API Error"}`);
+                setFeedbackToast({
+                    type: "error",
+                    text: `Failed to deliver to ${member.name}: ${data.error || "Meta API error"}`,
+                });
             }
         } catch (err: any) {
             console.error(err);
-            alert("⚠️ Request failed. Server check karo.");
+            setFeedbackToast({
+                type: "error",
+                text: "Backend API se connect nahi ho paya. Server check karein.",
+            });
         } finally {
             setSendingId(null);
-            setReminderModalMember(null);
         }
     };
 
     // Search filter
     const filteredMembers = members.filter((m) =>
-        m.name.toLowerCase().includes(searchQuery.toLowerCase())
+        m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.phone.includes(searchQuery)
     );
 
     if (!isMounted) return null;
@@ -204,6 +224,7 @@ export default function GymAdminDashboard() {
                             </p>
                         </div>
 
+                        {/* Actions: openGym Engine removed */}
                         <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
                             <Link
                                 href="/admin/chat"
@@ -214,17 +235,31 @@ export default function GymAdminDashboard() {
 
                             <button
                                 onClick={() => setIsAddModalOpen(true)}
-                                className="bg-[#00ff87] hover:bg-[#00e57a] text-black font-semibold text-xs px-4 py-2.5 rounded-lg flex items-center gap-1.5 transition-all shadow-lg shadow-[#00ff87]/20 active:scale-95"
+                                className="bg-[#00ff87] hover:bg-[#00e57a] text-black font-semibold text-xs px-4 py-2.5 rounded-lg flex items-center gap-1.5 transition-all shadow-lg shadow-[#00ff87]/20 active:scale-95 cursor-pointer"
                             >
                                 <span>+</span> Add Member
-                            </button>
-
-                            <button className="bg-[#1b1c20] hover:bg-[#23252a] text-zinc-300 font-medium text-xs px-3.5 py-2.5 rounded-lg border border-zinc-800 transition-all flex items-center gap-1.5">
-                                openGym Engine 🚀
                             </button>
                         </div>
                     </div>
                 </div>
+
+                {/* Feedback Toast Notification */}
+                {feedbackToast && (
+                    <div
+                        className={`p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between animate-in fade-in slide-in-from-top-2 duration-200 ${feedbackToast.type === "success"
+                                ? "bg-[#00ff87]/10 border border-[#00ff87]/30 text-[#00ff87]"
+                                : "bg-red-500/10 border border-red-500/30 text-red-400"
+                            }`}
+                    >
+                        <span>{feedbackToast.text}</span>
+                        <button
+                            onClick={() => setFeedbackToast(null)}
+                            className="text-zinc-400 hover:text-white ml-3 text-xs cursor-pointer"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                )}
 
                 {/* Top Metric Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -269,7 +304,7 @@ export default function GymAdminDashboard() {
                             </span>
                             <input
                                 type="text"
-                                placeholder="Search member name..."
+                                placeholder="Search member name or phone..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="w-full bg-[#1b1c20] border border-zinc-800/90 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#00ff87]/60"
@@ -291,57 +326,74 @@ export default function GymAdminDashboard() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-800/50">
-                                {filteredMembers.map((member) => (
-                                    <tr
-                                        key={member.id}
-                                        className="hover:bg-[#1a1b1f]/60 transition-colors"
-                                    >
-                                        <td className="py-3.5 font-semibold text-zinc-100">
-                                            {member.name}
-                                        </td>
-                                        <td className="py-3.5 text-zinc-400">{member.plan}</td>
-                                        <td className="py-3.5 text-zinc-400 font-mono">
-                                            {member.dueDate}
-                                        </td>
-                                        <td className="py-3.5">
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                                                🔥 {member.streakDays}d
-                                            </span>
-                                        </td>
-                                        <td className="py-3.5">
-                                            <span
-                                                className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                                                    member.status === "Paid"
-                                                        ? "bg-[#00ff87]/10 text-[#00ff87]"
-                                                        : member.status === "Overdue"
-                                                        ? "bg-red-500/10 text-red-400"
-                                                        : "bg-amber-500/10 text-amber-400"
-                                                }`}
-                                            >
-                                                {member.status}
-                                            </span>
-                                        </td>
-                                        <td className="py-3.5 text-right">
-                                            <button
-                                                onClick={() => setReminderModalMember(member)}
-                                                disabled={sendingId === member.id}
-                                                className="bg-[#00ff87]/10 hover:bg-[#00ff87]/20 border border-[#00ff87]/30 text-[#00ff87] disabled:opacity-50 text-[11px] font-semibold px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition-all active:scale-95"
-                                            >
-                                                {sendingId === member.id ? (
-                                                    <>
-                                                        <span className="animate-spin text-xs">🌀</span>
-                                                        <span>Sending...</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <span>💬</span>
-                                                        <span>Send Reminder</span>
-                                                    </>
-                                                )}
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
+                                {filteredMembers.map((member) => {
+                                    const isSending = sendingId === member.id;
+                                    const isSent = sentId === member.id;
+
+                                    return (
+                                        <tr
+                                            key={member.id}
+                                            className="hover:bg-[#1a1b1f]/60 transition-colors"
+                                        >
+                                            <td className="py-3.5 font-semibold text-zinc-100">
+                                                <div>{member.name}</div>
+                                                <div className="text-[10px] font-mono font-normal text-zinc-500">
+                                                    +{member.phone}
+                                                </div>
+                                            </td>
+                                            <td className="py-3.5 text-zinc-400 font-mono">{member.plan}</td>
+                                            <td className="py-3.5 text-zinc-400 font-mono">
+                                                {member.dueDate}
+                                            </td>
+                                            <td className="py-3.5">
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono">
+                                                    🔥 {member.streakDays}d
+                                                </span>
+                                            </td>
+                                            <td className="py-3.5">
+                                                <span
+                                                    className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono ${member.status === "Paid"
+                                                            ? "bg-[#00ff87]/10 text-[#00ff87]"
+                                                            : member.status === "Overdue"
+                                                                ? "bg-red-500/10 text-red-400"
+                                                                : "bg-amber-500/10 text-amber-400"
+                                                        }`}
+                                                >
+                                                    {member.status}
+                                                </span>
+                                            </td>
+                                            <td className="py-3.5 text-right">
+                                                <button
+                                                    onClick={() => handleDirectSendReminder(member)}
+                                                    disabled={isSending}
+                                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all shadow-sm active:scale-95 cursor-pointer ${isSent
+                                                            ? "bg-[#00ff87]/20 border border-[#00ff87] text-[#00ff87]"
+                                                            : isSending
+                                                                ? "bg-zinc-800 text-zinc-500 border border-zinc-700 cursor-not-allowed"
+                                                                : "bg-[#00ff87]/10 hover:bg-[#00ff87]/20 border border-[#00ff87]/30 text-[#00ff87]"
+                                                        }`}
+                                                >
+                                                    {isSending ? (
+                                                        <>
+                                                            <span className="animate-spin text-xs">🌀</span>
+                                                            <span>Sending...</span>
+                                                        </>
+                                                    ) : isSent ? (
+                                                        <>
+                                                            <span>✓</span>
+                                                            <span>Sent</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <span>💬</span>
+                                                            <span>Send Reminder</span>
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
@@ -377,7 +429,7 @@ export default function GymAdminDashboard() {
                                     Sneha Patel
                                 </span>
                             </div>
-                            <span className="text-xs font-bold text-amber-400">🔥 31d</span>
+                            <span className="text-xs font-bold text-amber-400 font-mono">🔥 31d</span>
                         </div>
 
                         <div className="bg-[#1b1c20] border border-zinc-800/80 rounded-lg p-3.5 flex items-center justify-between">
@@ -389,7 +441,7 @@ export default function GymAdminDashboard() {
                                     Aman Sharma
                                 </span>
                             </div>
-                            <span className="text-xs font-bold text-amber-400">🔥 24d</span>
+                            <span className="text-xs font-bold text-amber-400 font-mono">🔥 24d</span>
                         </div>
 
                         <div className="bg-[#1b1c20] border border-zinc-800/80 rounded-lg p-3.5 flex items-center justify-between">
@@ -401,125 +453,15 @@ export default function GymAdminDashboard() {
                                     Sachin Pilankar
                                 </span>
                             </div>
-                            <span className="text-xs font-bold text-amber-400">🔥 18d</span>
+                            <span className="text-xs font-bold text-amber-400 font-mono">🔥 18d</span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* SEND REMINDER CHOICE MODAL */}
-            {reminderModalMember && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-                    <div className="bg-[#141518] border border-zinc-800 rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-5">
-                        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-                            <div>
-                                <span className="text-[10px] font-mono text-[#00ff87] font-bold uppercase tracking-wider">
-                                    WhatsApp Reminder Dispatch
-                                </span>
-                                <h3 className="text-base font-extrabold text-white mt-0.5">
-                                    {reminderModalMember.name}
-                                </h3>
-                            </div>
-                            <button
-                                onClick={() => setReminderModalMember(null)}
-                                className="text-zinc-400 hover:text-white text-base px-2 py-1"
-                            >
-                                ✕
-                            </button>
-                        </div>
-
-                        <div className="bg-[#1b1c20] p-3 rounded-xl border border-zinc-800/80 text-xs space-y-1">
-                            <div className="flex justify-between text-zinc-400">
-                                <span>Plan & Status:</span>
-                                <span className="text-white font-semibold">
-                                    {reminderModalMember.plan} ({reminderModalMember.status})
-                                </span>
-                            </div>
-                            <div className="flex justify-between text-zinc-400">
-                                <span>Due Date:</span>
-                                <span className="text-amber-400 font-mono font-bold">
-                                    {reminderModalMember.dueDate}
-                                </span>
-                            </div>
-                            <div className="flex justify-between text-zinc-400">
-                                <span>Current Streak:</span>
-                                <span className="text-[#00ff87] font-bold">
-                                    🔥 {reminderModalMember.streakDays} Days
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Two Choices */}
-                        <div className="space-y-3 pt-1">
-                            {/* Choice 1: Direct WhatsApp Web */}
-                            <a
-                                href={`https://wa.me/${reminderModalMember.phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(
-                                    `Hi ${reminderModalMember.name}, this is a reminder from IronCore Gym that your ${reminderModalMember.plan} renewal of ₹2,499 is due on ${reminderModalMember.dueDate}. Please renew to maintain your gym biometric access and your ${reminderModalMember.streakDays}-day streak! 💳`
-                                )}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={() => setReminderModalMember(null)}
-                                className="block p-4 rounded-2xl bg-[#1a1d24] hover:bg-[#21252f] border border-zinc-700/80 hover:border-[#00ff87]/60 group transition-all"
-                            >
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2.5">
-                                        <div className="w-8 h-8 rounded-xl bg-[#00ff87]/10 text-[#00ff87] flex items-center justify-center text-sm font-bold border border-[#00ff87]/20">
-                                            ⚡
-                                        </div>
-                                        <div>
-                                            <span className="font-extrabold text-white text-xs block group-hover:text-[#00ff87] transition-colors">
-                                                Direct WhatsApp Web
-                                            </span>
-                                            <span className="text-[11px] text-zinc-400 block mt-0.5">
-                                                Open wa.me with pre-filled billing template
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <span className="text-xs text-[#00ff87] font-bold">Launch →</span>
-                                </div>
-                            </a>
-
-                            {/* Choice 2: Open CRM Chat */}
-                            <Link
-                                href={`/admin/chat?member=${encodeURIComponent(reminderModalMember.name)}`}
-                                onClick={() => setReminderModalMember(null)}
-                                className="block p-4 rounded-2xl bg-[#1a1d24] hover:bg-[#21252f] border border-zinc-700/80 hover:border-[#00ff87]/60 group transition-all"
-                            >
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2.5">
-                                        <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center text-sm font-bold border border-blue-500/20">
-                                            💬
-                                        </div>
-                                        <div>
-                                            <span className="font-extrabold text-white text-xs block group-hover:text-[#00ff87] transition-colors">
-                                                Open CRM Chat
-                                            </span>
-                                            <span className="text-[11px] text-zinc-400 block mt-0.5">
-                                                2-way conversation & quick template suite
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <span className="text-xs text-[#00ff87] font-bold">Open →</span>
-                                </div>
-                            </Link>
-                        </div>
-
-                        {/* Optional Meta Cloud API Background Dispatch */}
-                        <div className="pt-2 border-t border-zinc-800/80 text-center">
-                            <button
-                                onClick={() => sendWhatsAppReminder(reminderModalMember)}
-                                className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors inline-flex items-center gap-1"
-                            >
-                                <span>🚀 Or send background trigger via Meta Cloud API</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {/* Add Member Modal */}
             {isAddModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-150">
                     <div className="bg-[#141518] border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
                         <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
                             <h3 className="text-base font-bold text-white flex items-center gap-2">
@@ -527,7 +469,7 @@ export default function GymAdminDashboard() {
                             </h3>
                             <button
                                 onClick={() => setIsAddModalOpen(false)}
-                                className="text-zinc-500 hover:text-white text-sm"
+                                className="text-zinc-500 hover:text-white text-sm cursor-pointer"
                             >
                                 ✕
                             </button>
@@ -557,7 +499,7 @@ export default function GymAdminDashboard() {
                                 <input
                                     type="text"
                                     required
-                                    placeholder="e.g. 919876543210"
+                                    placeholder="e.g. 919004884885"
                                     value={newMember.phone}
                                     onChange={(e) =>
                                         setNewMember({ ...newMember, phone: e.target.value })
@@ -622,13 +564,13 @@ export default function GymAdminDashboard() {
                                 <button
                                     type="button"
                                     onClick={() => setIsAddModalOpen(false)}
-                                    className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium transition-colors"
+                                    className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium transition-colors cursor-pointer"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-4 py-2 rounded-lg bg-[#00ff87] hover:bg-[#00e57a] text-black font-semibold transition-colors shadow-lg shadow-[#00ff87]/20"
+                                    className="px-4 py-2 rounded-lg bg-[#00ff87] hover:bg-[#00e57a] text-black font-semibold transition-colors shadow-lg shadow-[#00ff87]/20 cursor-pointer"
                                 >
                                     Save Member
                                 </button>
