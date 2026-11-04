@@ -6,13 +6,12 @@ export async function POST(req: Request) {
 
         if (!phone || !otp) {
             return NextResponse.json(
-                { error: "Phone number aur OTP dono mandatory hain." },
+                { error: "Phone number and OTP are mandatory." },
                 { status: 400 }
             );
         }
 
         const cleanPhone = phone.replace(/[^0-9]/g, "");
-        // International format: India (+91)
         const recipientPhone = cleanPhone.startsWith("91") ? cleanPhone : `91${cleanPhone}`;
 
         const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || "1403885859474438";
@@ -20,7 +19,9 @@ export async function POST(req: Request) {
             process.env.WHATSAPP_ACCESS_TOKEN ||
             "EAAQBlq9m170BSxGt6mYqD2AbgC4OuCXXwuhBf80l4lACWpOwGr2CDnZC2XeHS1YIMZBqlZAdjlMPWPegIkcEirFuYCVOyQ32dcAGUfrwW3MJVWmSSAO6aFNU5gAPOuYT4ZAKoZAFnZBBeI0GwiB6o6E7ZCZC9BntMfeiEoZCJ5lMLh5pV5yaACcEEQ47GrtI3dTILD7Wxjnldb9PDWtZAOJGtzXvS4G6vME3UvkgCdECD5oZBCaTLENDZAScQcX1ZAGsNJkaP31DWLPDad3dxUBRbSJEcaYkjMtcZD";
 
-        // Meta WhatsApp Cloud API Call (hello_world template or direct custom text)
+        console.log(`[Meta Cloud API] Initiating OTP dispatch: ${otp} -> +${recipientPhone}`);
+
+        // Direct WhatsApp text message inside open 24h conversation window
         const metaResponse = await fetch(
             `https://graph.facebook.com/v20.0/${phoneId}/messages`,
             {
@@ -43,14 +44,15 @@ export async function POST(req: Request) {
         );
 
         const data = await metaResponse.json();
+        console.log("[Meta Cloud API Result]:", JSON.stringify(data));
 
         if (!metaResponse.ok) {
-            console.error("Meta WhatsApp API Error:", data);
+            console.error("[Meta Cloud API Error]:", data);
             return NextResponse.json(
                 {
                     error:
                         data.error?.message ||
-                        "Meta WhatsApp API call fail hui. Kripya check karein ki recipient number Meta whitelist me verified hai.",
+                        "Meta WhatsApp API call failed. Please check token or whitelist.",
                 },
                 { status: metaResponse.status }
             );
@@ -63,7 +65,7 @@ export async function POST(req: Request) {
     } catch (error: any) {
         console.error("Internal Server Error:", error);
         return NextResponse.json(
-            { error: "Internal server error occurred while sending OTP." },
+            { error: "Internal server error occurred while dispatching OTP." },
             { status: 500 }
         );
     }
