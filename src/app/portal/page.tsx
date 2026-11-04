@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { currentGym } from "@/gymConfig";
 
 interface WeightEntry {
     date: string;
@@ -20,6 +21,31 @@ interface Member {
     weightHistory?: WeightEntry[];
 }
 
+interface ChatMessage {
+    id: string;
+    sender: "member" | "admin";
+    text: string;
+    timestamp: string;
+    status?: "sent" | "delivered" | "read";
+    isTemplate?: boolean;
+}
+
+interface ChatMember {
+    id: string;
+    name: string;
+    phone: string;
+    plan: string;
+    streakDays: number;
+    avatarBg: string;
+    unreadCount: number;
+    metaWindowActive: boolean;
+    windowHoursRemaining: number;
+    dueDate: string;
+    lastMessage: string;
+    lastTime: string;
+    messages: ChatMessage[];
+}
+
 export default function MemberPortalDashboard() {
     const [member, setMember] = useState<Member | null>(null);
     const [targetWeight, setTargetWeight] = useState<number>(70);
@@ -28,20 +54,28 @@ export default function MemberPortalDashboard() {
     const [weightLogs, setWeightLogs] = useState<WeightEntry[]>([]);
     const [isMounted, setIsMounted] = useState<boolean>(false);
 
+    // Chat Drawer States
+    const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
+    const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+    const [chatInput, setChatInput] = useState<string>("");
+    const [hasUnreadSupport, setHasUnreadSupport] = useState<boolean>(true);
+    const chatEndRef = useRef<HTMLDivElement | null>(null);
+
     // 1. Load active member session or first member from CRM db
     useEffect(() => {
         setIsMounted(true);
         const storedMembers = localStorage.getItem("ironcore_members_db");
+        let activeMember: Member | null = null;
+
         if (storedMembers) {
             try {
                 const membersList: Member[] = JSON.parse(storedMembers);
                 if (membersList.length > 0) {
-                    // Default to first member or 'Sachin Pilankar'
-                    const active = membersList[0];
-                    setMember(active);
-                    setTargetWeight(active.targetWeightKg || 70);
+                    activeMember = membersList[0];
+                    setMember(activeMember);
+                    setTargetWeight(activeMember.targetWeightKg || 70);
 
-                    const defaultLogs: WeightEntry[] = active.weightHistory || [
+                    const defaultLogs: WeightEntry[] = activeMember.weightHistory || [
                         { date: "2026-10-25", weightKg: 73.2 },
                         { date: "2026-10-28", weightKg: 72.4 },
                         { date: "2026-11-01", weightKg: 71.8 },
@@ -59,7 +93,51 @@ export default function MemberPortalDashboard() {
         if (checkinDate === today) {
             setHasCheckedInToday(true);
         }
+
+        // Load or initialize member chat thread from CRM chat roster
+        const memberName = activeMember ? activeMember.name : "Athlete";
+        const savedRoster = localStorage.getItem("ironcore_crm_chat_roster");
+
+        if (savedRoster) {
+            try {
+                const roster: ChatMember[] = JSON.parse(savedRoster);
+                const matching = roster.find(
+                    (m) => m.name.toLowerCase() === memberName.toLowerCase()
+                );
+                if (matching && matching.messages && matching.messages.length > 0) {
+                    setChatMessages(matching.messages);
+                } else {
+                    initDefaultChat(memberName);
+                }
+            } catch (err) {
+                console.error("Failed to load chat roster", err);
+                initDefaultChat(memberName);
+            }
+        } else {
+            initDefaultChat(memberName);
+        }
     }, []);
+
+    const initDefaultChat = (name: string) => {
+        const initialMsgs: ChatMessage[] = [
+            {
+                id: "msg-init-1",
+                sender: "admin",
+                text: `Hi ${name}! 👋 Welcome to IronCore Coach & Desk Support. How can we assist your training or membership today?`,
+                timestamp: "10:00 AM",
+                status: "read",
+            },
+        ];
+        setChatMessages(initialMsgs);
+    };
+
+    // Scroll to bottom when messages change or chat drawer opens
+    useEffect(() => {
+        if (isChatOpen) {
+            chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            setHasUnreadSupport(false);
+        }
+    }, [chatMessages, isChatOpen]);
 
     // 2. Daily Check-in Handler (Syncs streak to localStorage & Admin CRM)
     const handleDailyCheckIn = () => {
@@ -148,6 +226,66 @@ export default function MemberPortalDashboard() {
         alert(`🎯 Target Weight updated to ${targetWeight} kg!`);
     };
 
+    // 5. Member sends message via slide-up chat drawer
+    const handleSendMemberMessage = (e: React.FormEvent) => {
+        e.preventDefault();
+        const text = chatInput.trim();
+        if (!text || !member) return;
+
+        const timeStr = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        const newMsg: ChatMessage = {
+            id: `msg-${Date.now()}`,
+            sender: "member",
+            text,
+            timestamp: timeStr,
+            status: "delivered",
+        };
+
+        const updatedMessages = [...chatMessages, newMsg];
+        setChatMessages(updatedMessages);
+        setChatInput("");
+
+        // Sync with CRM chat roster in localStorage so admin sees incoming message
+        const savedRoster = localStorage.getItem("ironcore_crm_chat_roster");
+        if (savedRoster) {
+            try {
+                const roster: ChatMember[] = JSON.parse(savedRoster);
+                const memberIndex = roster.findIndex(
+                    (m) => m.name.toLowerCase() === member.name.toLowerCase()
+                );
+
+                if (memberIndex >= 0) {
+                    roster[memberIndex] = {
+                        ...roster[memberIndex],
+                        lastMessage: text,
+                        lastTime: timeStr,
+                        unreadCount: (roster[memberIndex].unreadCount || 0) + 1,
+                        messages: [...roster[memberIndex].messages, newMsg],
+                    };
+                    localStorage.setItem("ironcore_crm_chat_roster", JSON.stringify(roster));
+                }
+            } catch (err) {
+                console.error("Failed to sync member message to CRM", err);
+            }
+        }
+
+        // Simulate instant coach acknowledgment after 1 second if only 1-2 messages exist
+        setTimeout(() => {
+            const replyMsg: ChatMessage = {
+                id: `reply-${Date.now()}`,
+                sender: "admin",
+                text: "Thanks for reaching out! A coach or desk manager has received your message and will respond shortly. You can also tap 'Direct WhatsApp' above for urgent support.",
+                timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                status: "read",
+            };
+            setChatMessages((prev) => [...prev, replyMsg]);
+        }, 1200);
+    };
+
+    const directWhatsAppUrl = `https://wa.me/${currentGym.phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(
+        `Hi ${currentGym.name} Coach, this is ${member ? member.name : "an athlete"} (${member ? member.plan : "Member"}). I need assistance with my workout plan & desk support.`
+    )}`;
+
     if (!isMounted || !member) {
         return (
             <div className="min-h-screen bg-[#0e0e10] flex items-center justify-center text-zinc-400 text-sm">
@@ -160,7 +298,7 @@ export default function MemberPortalDashboard() {
     const weightDifference = (latestWeight - targetWeight).toFixed(1);
 
     return (
-        <div className="min-h-screen bg-[#0e0e10] text-[#f4f4f5] p-6 lg:p-10 font-sans selection:bg-[#00ff87]/30">
+        <div className="min-h-screen bg-[#0e0e10] text-[#f4f4f5] p-6 lg:p-10 font-sans selection:bg-[#00ff87]/30 relative">
             <div className="max-w-5xl mx-auto space-y-8">
                 {/* Top Navbar */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800/80 pb-6">
@@ -187,7 +325,7 @@ export default function MemberPortalDashboard() {
                     </div>
                 </div>
 
-                {/* Hero Check-in & Streak Card (openGym /home Style) */}
+                {/* Hero Check-in & Streak Card */}
                 <div className="bg-[#141518] border border-zinc-800/80 rounded-2xl p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl relative overflow-hidden">
                     <div className="space-y-2 text-center md:text-left z-10">
                         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
@@ -318,63 +456,243 @@ export default function MemberPortalDashboard() {
                     </div>
                 </div>
 
-                {/* Feature Hub Navigation: Muscle Heatmap, Exercises & Workout History */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                    <div className="bg-[#141518] border border-zinc-800/80 rounded-xl p-5 flex items-center justify-between hover:border-[#00ff87]/40 transition-all group">
+                {/* 4-Column Feature Hub Navigation: Heatmap, Exercises, History & Coach Support */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+                    {/* Card 1: 3D Muscle Volume Heatmap */}
+                    <div className="bg-[#141518] border border-zinc-800/80 rounded-xl p-5 flex flex-col justify-between hover:border-[#00ff87]/40 transition-all group">
                         <div>
                             <span className="text-xl">🧬</span>
-                            <h4 className="text-sm font-bold text-white mt-1 group-hover:text-[#00ff87] transition-colors">
-                                3D Muscle Volume Heatmap
+                            <h4 className="text-sm font-bold text-white mt-2 group-hover:text-[#00ff87] transition-colors">
+                                3D Muscle Heatmap
                             </h4>
-                            <p className="text-xs text-zinc-500 mt-0.5">
-                                Weekly sets load mapped across full-body muscle anatomy.
+                            <p className="text-xs text-zinc-500 mt-1">
+                                Weekly volume load mapped across full-body muscle anatomy.
                             </p>
                         </div>
-                        <Link
-                            href="/portal/stats"
-                            className="bg-[#1b1c20] group-hover:bg-[#00ff87] group-hover:text-black border border-zinc-800 text-zinc-300 font-semibold text-xs px-3.5 py-2 rounded-lg transition-all"
-                        >
-                            View Stats →
-                        </Link>
+                        <div className="pt-4">
+                            <Link
+                                href="/portal/stats"
+                                className="inline-block w-full text-center bg-[#1b1c20] group-hover:bg-[#00ff87] group-hover:text-black border border-zinc-800 text-zinc-300 font-semibold text-xs py-2 rounded-lg transition-all"
+                            >
+                                View Stats →
+                            </Link>
+                        </div>
                     </div>
 
-                    <div className="bg-[#141518] border border-zinc-800/80 rounded-xl p-5 flex items-center justify-between hover:border-[#00ff87]/40 transition-all group">
+                    {/* Card 2: 5,600+ Exercise Engine */}
+                    <div className="bg-[#141518] border border-zinc-800/80 rounded-xl p-5 flex flex-col justify-between hover:border-[#00ff87]/40 transition-all group">
                         <div>
                             <span className="text-xl">🏋️</span>
-                            <h4 className="text-sm font-bold text-white mt-1 group-hover:text-[#00ff87] transition-colors">
+                            <h4 className="text-sm font-bold text-white mt-2 group-hover:text-[#00ff87] transition-colors">
                                 5,600+ Exercise Engine
                             </h4>
-                            <p className="text-xs text-zinc-500 mt-0.5">
+                            <p className="text-xs text-zinc-500 mt-1">
                                 Filter by equipment, barbell, dumbbell, and calisthenics.
                             </p>
                         </div>
-                        <Link
-                            href="/portal/exercises"
-                            className="bg-[#1b1c20] group-hover:bg-[#00ff87] group-hover:text-black border border-zinc-800 text-zinc-300 font-semibold text-xs px-3.5 py-2 rounded-lg transition-all"
-                        >
-                            Explore →
-                        </Link>
+                        <div className="pt-4">
+                            <Link
+                                href="/portal/exercises"
+                                className="inline-block w-full text-center bg-[#1b1c20] group-hover:bg-[#00ff87] group-hover:text-black border border-zinc-800 text-zinc-300 font-semibold text-xs py-2 rounded-lg transition-all"
+                            >
+                                Explore →
+                            </Link>
+                        </div>
                     </div>
 
-                    <div className="bg-[#141518] border border-zinc-800/80 rounded-xl p-5 flex items-center justify-between hover:border-[#00ff87]/40 transition-all group">
+                    {/* Card 3: Workout History & PDF Reports */}
+                    <div className="bg-[#141518] border border-zinc-800/80 rounded-xl p-5 flex flex-col justify-between hover:border-[#00ff87]/40 transition-all group">
                         <div>
                             <span className="text-xl">📄</span>
-                            <h4 className="text-sm font-bold text-white mt-1 group-hover:text-[#00ff87] transition-colors">
-                                Workout History & PDF Reports
+                            <h4 className="text-sm font-bold text-white mt-2 group-hover:text-[#00ff87] transition-colors">
+                                Workout History & Logbook
                             </h4>
-                            <p className="text-xs text-zinc-500 mt-0.5">
-                                Review past sessions, progressive volume overload, and print performance reports.
+                            <p className="text-xs text-zinc-500 mt-1">
+                                Review past sessions, progressive overload, and print PDF reports.
                             </p>
                         </div>
-                        <Link
-                            href="/portal/history"
-                            className="bg-[#1b1c20] group-hover:bg-[#00ff87] group-hover:text-black border border-zinc-800 text-zinc-300 font-semibold text-xs px-3.5 py-2 rounded-lg transition-all"
-                        >
-                            History →
-                        </Link>
+                        <div className="pt-4">
+                            <Link
+                                href="/portal/history"
+                                className="inline-block w-full text-center bg-[#1b1c20] group-hover:bg-[#00ff87] group-hover:text-black border border-zinc-800 text-zinc-300 font-semibold text-xs py-2 rounded-lg transition-all"
+                            >
+                                History →
+                            </Link>
+                        </div>
+                    </div>
+
+                    {/* Card 4: Coach & Desk Support */}
+                    <div className="bg-[#141518] border border-zinc-800/80 rounded-xl p-5 flex flex-col justify-between hover:border-[#00ff87]/40 transition-all group">
+                        <div>
+                            <span className="text-xl">💬</span>
+                            <h4 className="text-sm font-bold text-white mt-2 group-hover:text-[#00ff87] transition-colors">
+                                Coach & Desk Support
+                            </h4>
+                            <p className="text-xs text-zinc-500 mt-1">
+                                Instant 24/7 direct WhatsApp desk & trainer assistance.
+                            </p>
+                        </div>
+                        <div className="pt-4">
+                            <button
+                                onClick={() => setIsChatOpen(true)}
+                                className="w-full text-center bg-[#1b1c20] group-hover:bg-[#00ff87] group-hover:text-black border border-zinc-800 text-zinc-300 font-semibold text-xs py-2 rounded-lg transition-all"
+                            >
+                                Open Chat →
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            {/* ========================================================================= */}
+            {/* FLOATING CHAT WIDGET & MINI SLIDE-UP CHAT DRAWER                          */}
+            {/* ========================================================================= */}
+
+            {/* Mini Slide-Up Chat Drawer */}
+            {isChatOpen && (
+                <div className="fixed bottom-24 right-4 sm:right-6 z-50 w-[92vw] sm:w-[380px] h-[520px] max-h-[82vh] bg-[#121418] border border-zinc-800 rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 duration-200">
+                    {/* Drawer Header */}
+                    <div className="p-4 bg-[#16181f] border-b border-zinc-800 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="relative">
+                                <div className="w-10 h-10 rounded-2xl bg-emerald-600/20 border border-[#00ff87]/40 flex items-center justify-center text-lg font-black text-[#00ff87]">
+                                    🏋️
+                                </div>
+                                <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-[#00ff87] border-2 border-[#121418]" />
+                            </div>
+                            <div>
+                                <h3 className="font-extrabold text-sm text-white flex items-center gap-1.5">
+                                    IronCore Coach & Desk
+                                </h3>
+                                <span className="text-[10px] text-zinc-400 font-mono block">
+                                    Online • Replies in &lt; 5 mins
+                                </span>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => setIsChatOpen(false)}
+                            className="w-8 h-8 rounded-xl bg-[#1f222b] hover:bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center text-sm font-bold transition-colors"
+                            title="Close chat drawer"
+                        >
+                            ✕
+                        </button>
+                    </div>
+
+                    {/* Direct WhatsApp Quick Launch Banner */}
+                    <div className="px-4 py-2.5 bg-[#181a22] border-b border-zinc-800/80 flex items-center justify-between">
+                        <span className="text-[11px] text-zinc-400 flex items-center gap-1">
+                            <span>⚡</span> Need instant voice or call?
+                        </span>
+                        <a
+                            href={directWhatsAppUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[11px] font-bold bg-[#00ff87] hover:bg-[#00e57a] text-black px-2.5 py-1 rounded-lg transition-all flex items-center gap-1"
+                        >
+                            <span>WhatsApp</span>
+                            <span>↗</span>
+                        </a>
+                    </div>
+
+                    {/* Messages Thread Canvas */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#0d0e12]">
+                        <div className="flex justify-center my-1">
+                            <span className="bg-[#171920] border border-zinc-800 text-zinc-500 text-[10px] font-mono px-2.5 py-0.5 rounded-full">
+                                Encrypted IronCore Live Support
+                            </span>
+                        </div>
+
+                        {chatMessages.map((msg) => {
+                            const isMe = msg.sender === "member";
+                            return (
+                                <div
+                                    key={msg.id}
+                                    className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
+                                >
+                                    <div
+                                        className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs shadow-md leading-relaxed ${
+                                            isMe
+                                                ? "bg-[#00ff87]/20 border border-[#00ff87]/40 text-emerald-100 rounded-tr-xs"
+                                                : "bg-[#1b1d24] border border-zinc-800 text-zinc-200 rounded-tl-xs"
+                                        }`}
+                                    >
+                                        <p>{msg.text}</p>
+                                        <div
+                                            className={`text-[9px] font-mono mt-1 text-right ${
+                                                isMe ? "text-[#00ff87]/80" : "text-zinc-500"
+                                            }`}
+                                        >
+                                            {msg.timestamp} {isMe && "✓✓"}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        <div ref={chatEndRef} />
+                    </div>
+
+                    {/* Quick Question Chips */}
+                    <div className="px-3 py-2 bg-[#14161c] border-t border-zinc-800/80 flex items-center gap-1.5 overflow-x-auto scrollbar-none text-[10px]">
+                        <button
+                            onClick={() => setChatInput("Can I freeze my membership next week?")}
+                            className="px-2.5 py-1 rounded-lg bg-[#1e2028] hover:bg-[#272a35] text-zinc-300 border border-zinc-700/60 whitespace-nowrap"
+                        >
+                            ❄️ Freeze Membership
+                        </button>
+                        <button
+                            onClick={() => setChatInput("Need advice on my daily protein intake.")}
+                            className="px-2.5 py-1 rounded-lg bg-[#1e2028] hover:bg-[#272a35] text-zinc-300 border border-zinc-700/60 whitespace-nowrap"
+                        >
+                            🥗 Protein Guidance
+                        </button>
+                        <button
+                            onClick={() => setChatInput("When does my Smart Pass renew?")}
+                            className="px-2.5 py-1 rounded-lg bg-[#1e2028] hover:bg-[#272a35] text-zinc-300 border border-zinc-700/60 whitespace-nowrap"
+                        >
+                            💳 Renewal Query
+                        </button>
+                    </div>
+
+                    {/* Bottom Message Input */}
+                    <div className="p-3 bg-[#16181f] border-t border-zinc-800">
+                        <form onSubmit={handleSendMemberMessage} className="flex items-center gap-2">
+                            <input
+                                type="text"
+                                placeholder="Message IronCore Coach & Desk..."
+                                value={chatInput}
+                                onChange={(e) => setChatInput(e.target.value)}
+                                className="flex-1 bg-[#1d2028] border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#00ff87]"
+                            />
+                            <button
+                                type="submit"
+                                disabled={!chatInput.trim()}
+                                className="bg-[#00ff87] hover:bg-[#00e57a] disabled:opacity-40 text-black font-extrabold text-xs px-3.5 py-2 rounded-xl transition-all shadow-md active:scale-95"
+                            >
+                                ➤
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Neon Green Floating Action Button */}
+            <button
+                onClick={() => setIsChatOpen(!isChatOpen)}
+                className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-[#00ff87] hover:bg-[#00e57a] text-black shadow-2xl shadow-[#00ff87]/30 flex items-center justify-center transition-all active:scale-95 group border-2 border-black"
+                title="Chat with Gym / Coach"
+            >
+                {/* Unread Indicator Dot */}
+                {hasUnreadSupport && !isChatOpen && (
+                    <span className="absolute top-0 right-0 w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-black animate-pulse" />
+                )}
+
+                {isChatOpen ? (
+                    <span className="text-xl font-black">✕</span>
+                ) : (
+                    <span className="text-2xl group-hover:scale-110 transition-transform">💬</span>
+                )}
+            </button>
         </div>
     );
 }
