@@ -25,6 +25,15 @@ const DEFAULT_MEMBERS: Member[] = [
     },
     {
         id: "1",
+        name: "Sneha Pilankar",
+        phone: "919087799948",
+        plan: "Smart Pass",
+        dueDate: "2026-11-28",
+        streakDays: 20,
+        status: "Due",
+    },
+    {
+        id: "2",
         name: "Sachin Pilankar",
         phone: "919876543210",
         plan: "Smart Pass",
@@ -33,7 +42,7 @@ const DEFAULT_MEMBERS: Member[] = [
         status: "Due",
     },
     {
-        id: "2",
+        id: "3",
         name: "Aman Sharma",
         phone: "919876543211",
         plan: "Smart Pass",
@@ -42,7 +51,7 @@ const DEFAULT_MEMBERS: Member[] = [
         status: "Due",
     },
     {
-        id: "3",
+        id: "4",
         name: "Rohan Verma",
         phone: "919876543212",
         plan: "Standard",
@@ -51,7 +60,7 @@ const DEFAULT_MEMBERS: Member[] = [
         status: "Due",
     },
     {
-        id: "4",
+        id: "5",
         name: "Sneha Patel",
         phone: "919876543213",
         plan: "Smart Pass",
@@ -60,7 +69,7 @@ const DEFAULT_MEMBERS: Member[] = [
         status: "Paid",
     },
     {
-        id: "5",
+        id: "6",
         name: "Vikram Malhotra",
         phone: "919876543214",
         plan: "Smart Pass",
@@ -77,8 +86,9 @@ export default function GymAdminDashboard() {
     const [sentId, setSentId] = useState<string | null>(null);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [feedbackToast, setFeedbackToast] = useState<{
-        type: "success" | "error";
+        type: "success" | "warning" | "error";
         text: string;
+        actionUrl?: string;
     } | null>(null);
     const [isMounted, setIsMounted] = useState(false);
 
@@ -91,7 +101,6 @@ export default function GymAdminDashboard() {
         streakDays: 1,
     });
 
-    // 1. LocalStorage se saved members load karo (Refresh persistence)
     useEffect(() => {
         setIsMounted(true);
         const saved = localStorage.getItem("ironcore_members_db");
@@ -107,13 +116,11 @@ export default function GymAdminDashboard() {
         }
     }, []);
 
-    // 2. State + LocalStorage dono me data save karne ka helper
     const updateMembersState = (updatedList: Member[]) => {
         setMembers(updatedList);
         localStorage.setItem("ironcore_members_db", JSON.stringify(updatedList));
     };
 
-    // 3. New Member Add Handler
     const handleAddMember = (e: React.FormEvent) => {
         e.preventDefault();
         if (!newMember.name || !newMember.phone || !newMember.dueDate) {
@@ -137,7 +144,6 @@ export default function GymAdminDashboard() {
         const updated = [memberToAdd, ...members];
         updateMembersState(updated);
 
-        // Reset & close modal
         setNewMember({
             name: "",
             phone: "",
@@ -148,10 +154,27 @@ export default function GymAdminDashboard() {
         setIsAddModalOpen(false);
     };
 
-    // 4. Meta Cloud API Personalized Dynamic WhatsApp Reminder Trigger
-    const handleDirectSendReminder = async (member: Member) => {
+    // Helper: Formats 100% personalized message url for WhatsApp Web
+    const buildPersonalizedWhatsAppUrl = (m: Member) => {
+        const renewalPrice = m.plan === "Smart Pass" ? "1,999" : "1,499";
+        const message =
+            `🏋️ *IronCore Fitness • Membership Renewal Alert*\n\n` +
+            `Hi *${m.name}*! 👋\n\n` +
+            `Aapka *${m.plan}* subscription *${m.dueDate}* ko renew hone wala hai.\n\n` +
+            `🔥 *Workout Streak:* *${m.streakDays} Days Unbroken!*\n` +
+            `Top 3 consistency leaderboard me bane rehne aur monthly rewards ke liye apna pass time par renew karein.\n\n` +
+            `💳 *Renewal Amount:* ₹${renewalPrice}/month\n` +
+            `⚡ *Payment:* Gym front desk par UPI scan karein ya online renew karein.\n\n` +
+            `Stay Strong! 💪`;
+        return `https://wa.me/${m.phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(message)}`;
+    };
+
+    // Smart Dispatch Handler: Meta Cloud API -> Auto-fallback to WhatsApp Web on sandbox whitelist error
+    const handleSmartReminderDispatch = async (member: Member) => {
         setSendingId(member.id);
         setFeedbackToast(null);
+
+        const fallbackUrl = buildPersonalizedWhatsAppUrl(member);
 
         try {
             const res = await fetch("/api/whatsapp/send-reminder", {
@@ -170,33 +193,55 @@ export default function GymAdminDashboard() {
             const data = await res.json();
 
             if (res.ok && data.success) {
+                // Success directly through Meta Cloud API
                 setSentId(member.id);
                 setFeedbackToast({
                     type: "success",
-                    text: `✓ Personalized renewal reminder WhatsApp par bhej diya gaya: ${member.name} (+${member.phone})`,
+                    text: `✓ Meta Cloud API: Personalized reminder WhatsApp par successfully deliver ho gaya to ${member.name} (+${member.phone})`,
                 });
                 setTimeout(() => setSentId(null), 4000);
             } else {
-                setFeedbackToast({
-                    type: "error",
-                    text: `Failed to deliver to ${member.name}: ${data.error || "Meta API error"}`,
-                });
+                // Auto Fallback: Check if it's the Meta Sandbox #131030 error
+                const isSandboxError =
+                    typeof data.error === "string" &&
+                    (data.error.includes("131030") || data.error.includes("allowed list"));
+
+                if (isSandboxError) {
+                    // Open WhatsApp Web immediately in a new tab without requiring sandbox whitelist
+                    window.open(fallbackUrl, "_blank");
+
+                    setSentId(member.id);
+                    setFeedbackToast({
+                        type: "warning",
+                        text: `⚡ Meta Sandbox restriction bypassed: WhatsApp Web auto-launch ho gaya hai with pre-filled message for ${member.name}!`,
+                        actionUrl: fallbackUrl,
+                    });
+                    setTimeout(() => setSentId(null), 4000);
+                } else {
+                    setFeedbackToast({
+                        type: "error",
+                        text: `API Error: ${data.error || "Failed to dispatch"}. Direct WhatsApp Web use karein.`,
+                        actionUrl: fallbackUrl,
+                    });
+                }
             }
-        } catch (err: any) {
-            console.error(err);
+        } catch {
+            // Network fallback
+            window.open(fallbackUrl, "_blank");
             setFeedbackToast({
-                type: "error",
-                text: "Backend API se connect nahi ho paya. Server check karein.",
+                type: "warning",
+                text: `Network unreachable: WhatsApp Web auto-launch ho gaya hai for ${member.name}.`,
+                actionUrl: fallbackUrl,
             });
         } finally {
             setSendingId(null);
         }
     };
 
-    // Search filter
-    const filteredMembers = members.filter((m) =>
-        m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.phone.includes(searchQuery)
+    const filteredMembers = members.filter(
+        (m) =>
+            m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            m.phone.includes(searchQuery)
     );
 
     if (!isMounted) return null;
@@ -224,7 +269,6 @@ export default function GymAdminDashboard() {
                             </p>
                         </div>
 
-                        {/* Actions: openGym Engine removed */}
                         <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
                             <Link
                                 href="/admin/chat"
@@ -243,21 +287,46 @@ export default function GymAdminDashboard() {
                     </div>
                 </div>
 
-                {/* Feedback Toast Notification */}
+                {/* Feedback Toast Notification Banner */}
                 {feedbackToast && (
                     <div
-                        className={`p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between animate-in fade-in slide-in-from-top-2 duration-200 ${feedbackToast.type === "success"
-                                ? "bg-[#00ff87]/10 border border-[#00ff87]/30 text-[#00ff87]"
-                                : "bg-red-500/10 border border-red-500/30 text-red-400"
+                        className={`p-4 rounded-2xl text-xs font-semibold flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-200 shadow-xl ${feedbackToast.type === "success"
+                                ? "bg-[#00ff87]/10 border border-[#00ff87]/40 text-[#00ff87]"
+                                : feedbackToast.type === "warning"
+                                    ? "bg-amber-500/10 border border-amber-500/40 text-amber-300"
+                                    : "bg-red-500/10 border border-red-500/40 text-red-400"
                             }`}
                     >
-                        <span>{feedbackToast.text}</span>
-                        <button
-                            onClick={() => setFeedbackToast(null)}
-                            className="text-zinc-400 hover:text-white ml-3 text-xs cursor-pointer"
-                        >
-                            ✕
-                        </button>
+                        <div className="flex items-center gap-2.5">
+                            <span className="text-sm">
+                                {feedbackToast.type === "success"
+                                    ? "✓"
+                                    : feedbackToast.type === "warning"
+                                        ? "⚡"
+                                        : "⚠️"}
+                            </span>
+                            <span className="leading-relaxed">{feedbackToast.text}</span>
+                        </div>
+
+                        <div className="flex items-center gap-2 self-end sm:self-auto">
+                            {feedbackToast.actionUrl && (
+                                <a
+                                    href={feedbackToast.actionUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="bg-[#00ff87] hover:bg-[#00e57a] text-black px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5 whitespace-nowrap"
+                                >
+                                    <span>Open WhatsApp Web</span>
+                                    <span>↗</span>
+                                </a>
+                            )}
+                            <button
+                                onClick={() => setFeedbackToast(null)}
+                                className="text-zinc-400 hover:text-white px-2 py-1 text-xs cursor-pointer"
+                            >
+                                ✕
+                            </button>
+                        </div>
                     </div>
                 )}
 
@@ -363,33 +432,48 @@ export default function GymAdminDashboard() {
                                                 </span>
                                             </td>
                                             <td className="py-3.5 text-right">
-                                                <button
-                                                    onClick={() => handleDirectSendReminder(member)}
-                                                    disabled={isSending}
-                                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all shadow-sm active:scale-95 cursor-pointer ${isSent
-                                                            ? "bg-[#00ff87]/20 border border-[#00ff87] text-[#00ff87]"
-                                                            : isSending
-                                                                ? "bg-zinc-800 text-zinc-500 border border-zinc-700 cursor-not-allowed"
-                                                                : "bg-[#00ff87]/10 hover:bg-[#00ff87]/20 border border-[#00ff87]/30 text-[#00ff87]"
-                                                        }`}
-                                                >
-                                                    {isSending ? (
-                                                        <>
-                                                            <span className="animate-spin text-xs">🌀</span>
-                                                            <span>Sending...</span>
-                                                        </>
-                                                    ) : isSent ? (
-                                                        <>
-                                                            <span>✓</span>
-                                                            <span>Sent</span>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <span>💬</span>
-                                                            <span>Send Reminder</span>
-                                                        </>
-                                                    )}
-                                                </button>
+                                                <div className="flex items-center justify-end gap-1.5">
+                                                    {/* Primary 1-Click Action: Smart API Dispatch with auto-fallback */}
+                                                    <button
+                                                        onClick={() => handleSmartReminderDispatch(member)}
+                                                        disabled={isSending}
+                                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all shadow-sm active:scale-95 cursor-pointer ${isSent
+                                                                ? "bg-[#00ff87]/20 border border-[#00ff87] text-[#00ff87]"
+                                                                : isSending
+                                                                    ? "bg-zinc-800 text-zinc-500 border border-zinc-700 cursor-not-allowed"
+                                                                    : "bg-[#00ff87]/10 hover:bg-[#00ff87]/20 border border-[#00ff87]/30 text-[#00ff87]"
+                                                            }`}
+                                                    >
+                                                        {isSending ? (
+                                                            <>
+                                                                <span className="animate-spin text-xs">🌀</span>
+                                                                <span>Sending...</span>
+                                                            </>
+                                                        ) : isSent ? (
+                                                            <>
+                                                                <span>✓</span>
+                                                                <span>Dispatched</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <span>💬</span>
+                                                                <span>Send Reminder</span>
+                                                            </>
+                                                        )}
+                                                    </button>
+
+                                                    {/* Direct 1-Click WhatsApp Web Trigger */}
+                                                    <a
+                                                        href={buildPersonalizedWhatsAppUrl(member)}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="px-2.5 py-1.5 rounded-lg bg-[#181a20] hover:bg-[#252830] text-zinc-400 hover:text-[#00ff87] border border-zinc-800 transition-colors text-xs font-semibold flex items-center gap-1"
+                                                        title="Direct WhatsApp Web (No Meta sandbox restrictions)"
+                                                    >
+                                                        <span>📱</span>
+                                                        <span className="hidden sm:inline text-[10px]">WA</span>
+                                                    </a>
+                                                </div>
                                             </td>
                                         </tr>
                                     );
