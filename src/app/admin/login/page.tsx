@@ -12,24 +12,31 @@ export default function AdminLoginPage() {
     const [errorMsg, setErrorMsg] = useState("");
     const [isLoading, setIsLoading] = useState(false);
 
-    const handleAdminLogin = (e: React.FormEvent) => {
+    const handleAdminLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrorMsg("");
         setIsLoading(true);
 
-        setTimeout(() => {
-            // Demo master credential check (Accepts admin email & password)
-            if (
-                (email.toLowerCase() === "admin@ironcore.fit" && password === "ironcore2026") ||
-                (email.includes("@") && password.length >= 6)
-            ) {
+        try {
+            const res = await fetch("/api/admin/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: email.trim(), password }),
+            });
+
+            const data = await res.json();
+
+            if (res.ok && data.success) {
                 localStorage.setItem("ironcore_admin_session", "authenticated");
                 router.push("/admin");
             } else {
-                setErrorMsg("Invalid Admin Email or Password. Minimum 6 characters required.");
-                setIsLoading(false);
+                setErrorMsg(data.error || "Invalid Admin Email or Password.");
             }
-        }, 600);
+        } catch {
+            setErrorMsg("Authentication server unreachable. Please try again.");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
