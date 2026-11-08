@@ -39,6 +39,16 @@ interface Member {
     status: "Due" | "Paid" | "Overdue";
 }
 
+const DEFAULT_MEMBER: Member = {
+    id: "mem-kshitij",
+    name: "Kshitij Pilankar",
+    phone: "919004884885",
+    plan: "Smart Pass",
+    dueDate: "2026-11-20",
+    streakDays: 2,
+    status: "Due",
+};
+
 export default function AthleteSupportFullPage() {
     const [member, setMember] = useState<Member | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -48,20 +58,29 @@ export default function AthleteSupportFullPage() {
 
     useEffect(() => {
         setIsMounted(true);
-        const storedMembers = localStorage.getItem("ironcore_members_db");
-        let activeMember: Member | null = null;
+        let activeMember: Member = DEFAULT_MEMBER;
 
-        if (storedMembers) {
-            try {
-                const membersList: Member[] = JSON.parse(storedMembers);
-                if (membersList.length > 0) {
-                    activeMember = membersList[0];
-                    setMember(activeMember);
+        try {
+            const storedActive = localStorage.getItem("ironcore_active_member");
+            if (storedActive) {
+                const parsed = JSON.parse(storedActive);
+                if (parsed && typeof parsed === "object" && parsed.name) {
+                    activeMember = { ...DEFAULT_MEMBER, ...parsed };
                 }
-            } catch (e) {
-                console.error("Failed to load member profile", e);
+            } else {
+                const storedMembers = localStorage.getItem("ironcore_members_db");
+                if (storedMembers) {
+                    const membersList: Member[] = JSON.parse(storedMembers);
+                    if (Array.isArray(membersList) && membersList.length > 0) {
+                        activeMember = { ...DEFAULT_MEMBER, ...membersList[0] };
+                    }
+                }
             }
+        } catch (e) {
+            console.error("Failed to load member profile", e);
         }
+
+        setMember(activeMember);
 
         const memberName = activeMember ? activeMember.name : "Athlete";
         const savedRoster = localStorage.getItem("ironcore_crm_chat_roster");

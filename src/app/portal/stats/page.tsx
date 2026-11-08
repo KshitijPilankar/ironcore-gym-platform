@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import bodyPathsData from "@/lib/body-paths.js";
 
-export const INERT_PARTS = [
+const INERT_PARTS = [
     "head",
     "hair",
     "neck",
@@ -14,7 +14,7 @@ export const INERT_PARTS = [
     "ankles",
 ];
 
-export const MUSCLE_GROUPS = [
+const MUSCLE_GROUPS = [
     "chest",
     "upper-back",
     "deltoids",
@@ -33,7 +33,7 @@ export const MUSCLE_GROUPS = [
     "tibialis",
 ];
 
-export const MUSCLE_META: Record<
+const MUSCLE_META: Record<
     string,
     { label: string; category: "Upper Body" | "Core" | "Lower Body" | "Arms"; anterior: boolean }
 > = {
