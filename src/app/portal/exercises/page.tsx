@@ -45,15 +45,82 @@ function titleCase(str: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// High-Tech Animated SVG Anatomy Thumbnail with Fallback
+// Clean URL Encoder for Linux/Vercel Special Characters & Parentheses
+// ---------------------------------------------------------------------------
+function encodeSafeUrl(url: string | null | undefined): string {
+    if (!url) return "";
+    return encodeURI(url).replace(/\(/g, "%28").replace(/\)/g, "%29");
+}
+
+function getPrimaryThumbnailSrc(ex: RawExercise): string {
+    const rawPath =
+        (ex as any).imageUrl ||
+        (ex as any).thumbnailUrl ||
+        (ex.img ? `https://cdn.jsdelivr.net/gh/DuarteSantos8/openGym@main/catalogue/media/still/${ex.img}` : "");
+    return encodeSafeUrl(rawPath);
+}
+
+function getModalAnimationSrc(ex: RawExercise): string {
+    const rawPath =
+        (ex as any).gifUrl ||
+        (ex as any).videoUrl ||
+        (ex as any).animationUrl ||
+        (ex.gif ? `https://cdn.jsdelivr.net/gh/DuarteSantos8/openGym@main/catalogue/media/clip/${ex.gif}` : "");
+    return encodeSafeUrl(rawPath);
+}
+
+// ---------------------------------------------------------------------------
+// High-Tech Animated SVG Anatomy Thumbnail with Progressive Fallback
 // ---------------------------------------------------------------------------
 function ExerciseThumbnail({ ex }: { ex: RawExercise }) {
-    const [hasError, setHasError] = useState(false);
-    const mediaSrc = ex.img
-        ? `https://cdn.jsdelivr.net/gh/DuarteSantos8/openGym@main/catalogue/media/still/${ex.img}`
-        : null;
+    const primarySrc = useMemo(() => getPrimaryThumbnailSrc(ex), [ex]);
+    const animationSrc = useMemo(() => getModalAnimationSrc(ex), [ex]);
 
-    if (!mediaSrc || hasError) {
+    // Stage 0: Attempting primary thumbnail
+    // Stage 1: Primary failed, attempting modal animation fallback
+    // Stage 2: Both failed -> gracefully render stylized dark-gradient anatomy container
+    const [fallbackStage, setFallbackStage] = useState<0 | 1 | 2>(() => {
+        if (!primarySrc && !animationSrc) return 2;
+        if (!primarySrc) return 1;
+        return 0;
+    });
+
+    const [currentSrc, setCurrentSrc] = useState<string>(() => {
+        if (primarySrc) return primarySrc;
+        if (animationSrc) return animationSrc;
+        return "";
+    });
+
+    // Reset cleanly when exercise prop changes
+    useEffect(() => {
+        const prim = getPrimaryThumbnailSrc(ex);
+        const anim = getModalAnimationSrc(ex);
+        if (prim) {
+            setFallbackStage(0);
+            setCurrentSrc(prim);
+        } else if (anim) {
+            setFallbackStage(1);
+            setCurrentSrc(anim);
+        } else {
+            setFallbackStage(2);
+            setCurrentSrc("");
+        }
+    }, [ex.id, ex.img, ex.gif]);
+
+    const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+        if (fallbackStage === 0 && animationSrc && animationSrc !== currentSrc) {
+            // First fallback: Immediately set target src to the exercise's working modal animation URL
+            setFallbackStage(1);
+            setCurrentSrc(animationSrc);
+            const target = e.currentTarget as HTMLImageElement;
+            target.src = animationSrc;
+        } else {
+            // Second fallback: Gracefully hide broken img and switch to stylized dark anatomy container
+            setFallbackStage(2);
+        }
+    };
+
+    if (fallbackStage === 2 || !currentSrc) {
         return (
             <div className="w-full h-full flex flex-col items-center justify-center p-3 relative overflow-hidden bg-gradient-to-b from-[#161820] via-[#121318] to-[#0d0e12]">
                 {/* Tech Radar Grid */}
@@ -82,7 +149,8 @@ function ExerciseThumbnail({ ex }: { ex: RawExercise }) {
                 <span className="text-[10px] font-bold tracking-wider text-[#00ff87] uppercase z-10 font-mono truncate max-w-[90%] text-center">
                     {ex.tg || ex.bp}
                 </span>
-                <span className="text-[9px] text-zinc-500 font-mono tracking-tight z-10">
+                <span className="text-[9px] text-zinc-500 font-mono tracking-tight z-10 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#00ff87] animate-pulse" />
                     ANATOMICAL CUES
                 </span>
             </div>
@@ -91,10 +159,10 @@ function ExerciseThumbnail({ ex }: { ex: RawExercise }) {
 
     return (
         <img
-            src={mediaSrc}
+            src={currentSrc}
             alt={ex.n}
             loading="lazy"
-            onError={() => setHasError(true)}
+            onError={handleImageError}
             className="w-full h-full object-contain scale-110 will-change-transform transition-transform duration-300 group-hover:scale-115"
         />
     );
@@ -142,12 +210,8 @@ function ExerciseModalPreview({ ex }: { ex: RawExercise }) {
         setRestTimer(null);
     };
 
-    const clipSrc = ex.gif
-        ? `https://cdn.jsdelivr.net/gh/DuarteSantos8/openGym@main/catalogue/media/clip/${ex.gif}`
-        : null;
-    const stillSrc = ex.img
-        ? `https://cdn.jsdelivr.net/gh/DuarteSantos8/openGym@main/catalogue/media/still/${ex.img}`
-        : null;
+    const clipSrc = getModalAnimationSrc(ex) || null;
+    const stillSrc = getPrimaryThumbnailSrc(ex) || null;
 
     // Tactical cues tailored to target anatomy
     const getCues = () => {
