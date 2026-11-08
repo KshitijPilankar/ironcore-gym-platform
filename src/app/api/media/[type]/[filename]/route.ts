@@ -12,14 +12,16 @@ export async function GET(
 
     // Sanitize type and filename to avoid path traversal
     const safeType = type === "clip" ? "clip" : "still";
-    const safeFilename = path.basename(filename);
+    const decodedFilename = decodeURIComponent(filename);
+    const safeFilename = path.basename(decodedFilename);
 
     const mediaDir = path.resolve(process.cwd(), "../workout-engine/catalogue/media", safeType);
     const filePath = path.join(mediaDir, safeFilename);
 
     // If local file does not exist (e.g. deployed to Vercel), redirect to ultra-fast jsDelivr CDN
     if (!fs.existsSync(filePath)) {
-        return NextResponse.redirect(`${CDN_MEDIA_BASE}/${safeType}/${safeFilename}`, 307);
+        const encodedFilename = encodeURI(safeFilename).replace(/\(/g, "%28").replace(/\)/g, "%29");
+        return NextResponse.redirect(`${CDN_MEDIA_BASE}/${safeType}/${encodedFilename}`, 307);
     }
 
     const stat = fs.statSync(filePath);
