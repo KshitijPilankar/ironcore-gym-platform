@@ -1,25 +1,61 @@
 import { NextResponse } from "next/server";
+import crypto from "crypto";
+import { checkRateLimit, saveOtp } from "@/lib/auth-store";
 
 export async function POST(req: Request) {
     try {
-        const { phone, otp } = await req.json();
+        const body = await req.json().catch(() => ({}));
+        const { phone } = body;
 
-        if (!phone || !otp) {
+        if (!phone || typeof phone !== "string") {
             return NextResponse.json(
-                { error: "Phone number and OTP are mandatory." },
+                { error: "10-digit mobile number is mandatory." },
                 { status: 400 }
             );
         }
 
         const cleanPhone = phone.replace(/[^0-9]/g, "");
-        const recipientPhone = cleanPhone.startsWith("91") ? cleanPhone : `91${cleanPhone}`;
 
-        const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || "1403885859474438";
-        const token =
-            process.env.WHATSAPP_ACCESS_TOKEN ||
-            "EAAQBlq9m170BSxGt6mYqD2AbgC4OuCXXwuhBf80l4lACWpOwGr2CDnZC2XeHS1YIMZBqlZAdjlMPWPegIkcEirFuYCVOyQ32dcAGUfrwW3MJVWmSSAO6aFNU5gAPOuYT4ZAKoZAFnZBBeI0GwiB6o6E7ZCZC9BntMfeiEoZCJ5lMLh5pV5yaACcEEQ47GrtI3dTILD7Wxjnldb9PDWtZAOJGtzXvS4G6vME3UvkgCdECD5oZBCaTLENDZAScQcX1ZAGsNJkaP31DWLPDad3dxUBRbSJEcaYkjMtcZD";
+        // 10-Digit Legitimate Indian Mobile Format Validation
+        const indianMobileRegex = /^[6-9]\d{9}$/;
+        const rawTenDigit = cleanPhone.length > 10 ? cleanPhone.slice(-10) : cleanPhone;
 
-        console.log(`[Meta Cloud API] Initiating OTP dispatch: ${otp} -> +${recipientPhone}`);
+        if (!indianMobileRegex.test(rawTenDigit)) {
+            return NextResponse.json(
+                { error: "Valid 10-digit Indian mobile number required (starting with 6, 7, 8, or 9)." },
+                { status: 400 }
+            );
+        }
+
+        const recipientPhone = `91${rawTenDigit}`;
+
+        // Rate limit check: max 5 requests per 10 minutes per phone
+        if (!checkRateLimit(recipientPhone)) {
+            return NextResponse.json(
+                { error: "Too many OTP requests. Please wait 10 minutes before requesting again." },
+                { status: 429 }
+            );
+        }
+
+        // SEC-01: Strictly read credentials from process.env, never use hardcoded fallbacks
+        const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+        const token = process.env.WHATSAPP_ACCESS_TOKEN;
+
+        if (!phoneId || !token) {
+            console.error("[Meta Cloud API Configuration Error]: Missing WHATSAPP_PHONE_NUMBER_ID or WHATSAPP_ACCESS_TOKEN.");
+            return NextResponse.json(
+                { error: "WhatsApp service configuration error on server." },
+                { status: 500 }
+            );
+        }
+
+        // SEC-02 & SEC-07: Cryptographically secure 4-digit OTP generated strictly on server
+        const secureOtp = crypto.randomInt(1000, 10000).toString();
+
+        // Store OTP with 5-minute expiry in memory store
+        saveOtp(recipientPhone, secureOtp);
+
+        console.log(`[Meta Cloud API] Dispatching secure OTP to +${recipientPhone}`);
 
         // Direct WhatsApp text message inside open 24h conversation window
         const metaResponse = await fetch(
@@ -37,14 +73,13 @@ export async function POST(req: Request) {
                     type: "text",
                     text: {
                         preview_url: false,
-                        body: `🏋️ *IronCore Fitness Verification*\n\nAapka login OTP code hai: *${otp}*\n\nYeh code 5 minutes ke liye valid hai. Kisi ke sath share na karein.`,
+                        body: `🏋️ *IronCore Fitness Verification*\n\nAapka login OTP code hai: *${secureOtp}*\n\nYeh code 5 minutes ke liye valid hai. Kisi ke sath share na karein.`,
                     },
                 }),
             }
         );
 
         const data = await metaResponse.json();
-        console.log("[Meta Cloud API Result]:", JSON.stringify(data));
 
         if (!metaResponse.ok) {
             console.error("[Meta Cloud API Error]:", data);
@@ -52,7 +87,7 @@ export async function POST(req: Request) {
                 {
                     error:
                         data.error?.message ||
-                        "Meta WhatsApp API call failed. Please check token or whitelist.",
+                        "Meta WhatsApp API call failed. Please check phone whitelist.",
                 },
                 { status: metaResponse.status }
             );
@@ -63,7 +98,7 @@ export async function POST(req: Request) {
             messageId: data.messages?.[0]?.id,
         });
     } catch (error: any) {
-        console.error("Internal Server Error:", error);
+        console.error("Internal Server Error in send-otp:", error);
         return NextResponse.json(
             { error: "Internal server error occurred while dispatching OTP." },
             { status: 500 }

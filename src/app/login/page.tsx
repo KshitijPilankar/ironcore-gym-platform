@@ -24,7 +24,6 @@ export default function MemberLoginPage() {
     // Inputs
     const [phone, setPhone] = useState("9004884885");
     const [otpInput, setOtpInput] = useState("");
-    const [sentOtp, setSentOtp] = useState("");
 
     // UI state
     const [errorMsg, setErrorMsg] = useState("");
@@ -46,7 +45,7 @@ export default function MemberLoginPage() {
         return () => clearInterval(timer);
     }, [authStep, countdown]);
 
-    // Step 1: Validate 10-Digit Mobile & Send Real WhatsApp OTP
+    // Step 1: Validate 10-Digit Mobile & Send Real WhatsApp OTP (Server-Generated)
     const handleSendOtp = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrorMsg("");
@@ -63,14 +62,11 @@ export default function MemberLoginPage() {
 
         setIsLoading(true);
 
-        const generatedCode = Math.floor(1000 + Math.random() * 9000).toString();
-        setSentOtp(generatedCode);
-
         try {
             const res = await fetch("/api/auth/send-otp", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ phone: cleanPhone, otp: generatedCode }),
+                body: JSON.stringify({ phone: cleanPhone }),
             });
 
             const data = await res.json();
@@ -90,17 +86,24 @@ export default function MemberLoginPage() {
         }
     };
 
-    // Step 2: Verify Real OTP and Login
-    const handleVerifyOtp = (e: React.FormEvent) => {
+    // Step 2: Verify Real OTP via Server-Side API (No Client Backdoor)
+    const handleVerifyOtp = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrorMsg("");
         setIsLoading(true);
 
         const cleanPhone = phone.replace(/[^0-9]/g, "");
 
-        setTimeout(() => {
-            // Verify against actual sent code or master development override
-            if (otpInput === sentOtp || otpInput === "1234") {
+        try {
+            const res = await fetch("/api/auth/verify-otp", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ phone: cleanPhone, otp: otpInput.trim() }),
+            });
+
+            const data = await res.json();
+
+            if (res.ok && data.success) {
                 const storedMembers = localStorage.getItem("ironcore_members_db");
                 let membersList: Member[] = [];
 
@@ -131,20 +134,20 @@ export default function MemberLoginPage() {
 
                 router.push("/portal");
             } else {
-                setErrorMsg("Galat OTP! Kripya WhatsApp par aaya hua 4-digit code enter karein.");
-                setIsLoading(false);
+                setErrorMsg(data.error || "Galat OTP! Kripya WhatsApp par aaya hua 4-digit code enter karein.");
             }
-        }, 500);
+        } catch {
+            setErrorMsg("Server verification failed. Please try again.");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    // Resend Real OTP Handler
+    // Resend Real OTP Handler (Server-Generated)
     const handleResendOtp = async () => {
         if (!canResend) return;
         setErrorMsg("");
         setIsLoading(true);
-
-        const newOtp = Math.floor(1000 + Math.random() * 9000).toString();
-        setSentOtp(newOtp);
 
         const cleanPhone = phone.replace(/[^0-9]/g, "");
 
@@ -152,7 +155,7 @@ export default function MemberLoginPage() {
             const res = await fetch("/api/auth/send-otp", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ phone: cleanPhone, otp: newOtp }),
+                body: JSON.stringify({ phone: cleanPhone }),
             });
             const data = await res.json();
             if (res.ok && data.success) {

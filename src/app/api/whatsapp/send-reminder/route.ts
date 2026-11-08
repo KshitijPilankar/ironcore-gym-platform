@@ -1,8 +1,30 @@
 import { NextResponse } from "next/server";
+import { verifySignedToken } from "@/lib/auth-store";
 
 export async function POST(req: Request) {
     try {
-        const { name, phone, plan, dueDate, streakDays, amount } = await req.json();
+        // SEC-05: Authenticate admin session before dispatching reminders
+        const cookieHeader = req.headers.get("cookie") || "";
+        const match = cookieHeader.match(/ironcore_admin_token=([^;]+)/);
+        const adminToken = match ? match[1] : null;
+
+        if (!adminToken) {
+            return NextResponse.json(
+                { error: "Unauthorized: Admin session required to send renewal reminders." },
+                { status: 401 }
+            );
+        }
+
+        const session = verifySignedToken(adminToken);
+        if (!session.valid || session.payload?.role !== "admin") {
+            return NextResponse.json(
+                { error: "Unauthorized: Invalid or expired admin credentials." },
+                { status: 401 }
+            );
+        }
+
+        const body = await req.json().catch(() => ({}));
+        const { name, phone, plan, dueDate, streakDays, amount } = body;
 
         if (!phone || !name) {
             return NextResponse.json(
@@ -11,28 +33,50 @@ export async function POST(req: Request) {
             );
         }
 
+        // Sanitize phone
         const cleanPhone = phone.replace(/[^0-9]/g, "");
-        const recipientPhone = cleanPhone.startsWith("91") ? cleanPhone : `91${cleanPhone}`;
+        const rawTenDigit = cleanPhone.length > 10 ? cleanPhone.slice(-10) : cleanPhone;
 
-        const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || "1403885859474438";
-        const token =
-            process.env.WHATSAPP_ACCESS_TOKEN ||
-            "EAAQBlq9m170BSxGt6mYqD2AbgC4OuCXXwuhBf80l4lACWpOwGr2CDnZC2XeHS1YIMZBqlZAdjlMPWPegIkcEirFuYCVOyQ32dcAGUfrwW3MJVWmSSAO6aFNU5gAPOuYT4ZAKoZAFnZBBeI0GwiB6o6E7ZCZC9BntMfeiEoZCJ5lMLh5pV5yaACcEEQ47GrtI3dTILD7Wxjnldb9PDWtZAOJGtzXvS4G6vME3UvkgCdECD5oZBCaTLENDZAScQcX1ZAGsNJkaP31DWLPDad3dxUBRbSJEcaYkjMtcZD";
+        if (!/^[6-9]\d{9}$/.test(rawTenDigit)) {
+            return NextResponse.json(
+                { error: "Invalid 10-digit Indian mobile number." },
+                { status: 400 }
+            );
+        }
 
-        const renewalPrice = amount || (plan === "Smart Pass" ? "1,999" : "1,499");
+        const recipientPhone = `91${rawTenDigit}`;
+
+        // SEC-01: Read credentials strictly from process.env, never use hardcoded strings
+        const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+        const token = process.env.WHATSAPP_ACCESS_TOKEN;
+
+        if (!phoneId || !token) {
+            console.error("[Meta Reminder API Error]: Missing WHATSAPP_PHONE_NUMBER_ID or WHATSAPP_ACCESS_TOKEN.");
+            return NextResponse.json(
+                { error: "Server WhatsApp credentials not configured." },
+                { status: 500 }
+            );
+        }
+
+        // Sanitize inputs to prevent text injection
+        const safeName = String(name).slice(0, 50).replace(/[^\w\s.-]/gi, "");
+        const safePlan = String(plan || "Smart Pass").slice(0, 30);
+        const safeDueDate = String(dueDate || "Soon").slice(0, 20);
+        const safeStreak = Math.max(0, parseInt(String(streakDays), 10) || 0);
+        const renewalPrice = String(amount || (safePlan === "Smart Pass" ? "1,999" : "1,499")).replace(/[^0-9,]/g, "");
 
         // Dynamic Personalized Message Body
         const personalizedMessage =
             `🏋️ *IronCore Fitness • Membership Renewal Alert*\n\n` +
-            `Hi *${name}*! 👋\n\n` +
-            `Aapka *${plan}* subscription *${dueDate}* ko renew hone wala hai.\n\n` +
-            `🔥 *Workout Streak:* *${streakDays} Days Unbroken!*\n` +
+            `Hi *${safeName}*! 👋\n\n` +
+            `Aapka *${safePlan}* subscription *${safeDueDate}* ko renew hone wala hai.\n\n` +
+            `🔥 *Workout Streak:* *${safeStreak} Days Unbroken!*\n` +
             `Top 3 consistency leaderboard me bane rehne aur monthly rewards ke liye apna pass time par renew karein.\n\n` +
             `💳 *Renewal Amount:* ₹${renewalPrice}/month\n` +
             `⚡ *Payment:* Gym front desk par UPI scan karein ya instant renew karein.\n\n` +
             `Agar training ya membership pause/freeze karni ho toh yahan direct reply karein. Stay Strong! 💪`;
 
-        console.log(`[Meta Reminder API] Sending personalized alert to ${name} (+${recipientPhone})`);
+        console.log(`[Meta Reminder API] Admin dispatching verified alert to ${safeName} (+${recipientPhone})`);
 
         const metaResponse = await fetch(
             `https://graph.facebook.com/v20.0/${phoneId}/messages`,
@@ -56,7 +100,6 @@ export async function POST(req: Request) {
         );
 
         const data = await metaResponse.json();
-        console.log("[Meta Reminder API Raw Result]:", JSON.stringify(data));
 
         if (!metaResponse.ok) {
             console.error("[Meta Reminder API Error]:", data);
@@ -75,7 +118,7 @@ export async function POST(req: Request) {
             messageId: data.messages?.[0]?.id,
         });
     } catch (error: any) {
-        console.error("Internal Server Error:", error);
+        console.error("Internal Server Error in send-reminder:", error);
         return NextResponse.json(
             { error: "Server error occurred while dispatching WhatsApp reminder." },
             { status: 500 }

@@ -1,7 +1,27 @@
 import { NextResponse } from "next/server";
+import { verifySignedToken } from "@/lib/auth-store";
 
 export async function POST(req: Request) {
     try {
+        const cookieHeader = req.headers.get("cookie") || "";
+        const match = cookieHeader.match(/ironcore_admin_token=([^;]+)/);
+        const adminToken = match ? match[1] : null;
+
+        if (!adminToken) {
+            return NextResponse.json(
+                { success: false, error: "Unauthorized: Admin session required" },
+                { status: 401 }
+            );
+        }
+
+        const session = verifySignedToken(adminToken);
+        if (!session.valid || session.payload?.role !== "admin") {
+            return NextResponse.json(
+                { success: false, error: "Unauthorized: Invalid admin credentials" },
+                { status: 401 }
+            );
+        }
+
         const { phone, memberName, dueDate, plan, streakDays } = await req.json();
 
         if (!phone) {
@@ -19,15 +39,26 @@ export async function POST(req: Request) {
         const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
         const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
 
-        // Dynamic Custom Message
+        if (!phoneNumberId || !accessToken) {
+            return NextResponse.json(
+                { success: false, error: "WhatsApp credentials not configured on server" },
+                { status: 500 }
+            );
+        }
+
+        const safeName = String(memberName || "Athlete").slice(0, 50).replace(/[^\w\s.-]/gi, "");
+        const safePlan = String(plan || "Smart Pass").slice(0, 30);
+        const safeDueDate = String(dueDate || "Soon").slice(0, 20);
+        const safeStreak = Math.max(0, parseInt(String(streakDays), 10) || 0);
+
         const messageText =
             `🏋️ *IronCore Fitness Reminder*
 ━━━━━━━━━━━━━━━━━━
-Hey *${memberName}*! 💪
+Hey *${safeName}*! 💪
 
-Aapka *${plan}* subscription *${dueDate}* ko renew hone wala hai.
+Aapka *${safePlan}* subscription *${safeDueDate}* ko renew hone wala hai.
 
-🔥 *Current Streak:* ${streakDays} Days! Streak tootne mat dena!
+🔥 *Current Streak:* ${safeStreak} Days! Streak tootne mat dena!
 💳 Renewal amount clear karne ke liye gym desk par visit karein ya UPI karein.
 
 _Stay Consistent, Stay Strong!_`;
@@ -56,7 +87,6 @@ _Stay Consistent, Stay Strong!_`;
         const data = await metaResponse.json();
 
         if (!metaResponse.ok) {
-            console.error("Meta API Error:", data);
             return NextResponse.json(
                 { success: false, error: data.error?.message || "Meta API error" },
                 { status: metaResponse.status }
@@ -65,7 +95,6 @@ _Stay Consistent, Stay Strong!_`;
 
         return NextResponse.json({ success: true, data });
     } catch (error: any) {
-        console.error("Internal Server Error:", error);
         return NextResponse.json(
             { success: false, error: error.message },
             { status: 500 }
