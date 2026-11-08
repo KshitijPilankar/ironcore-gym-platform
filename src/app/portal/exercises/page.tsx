@@ -44,6 +44,306 @@ function titleCase(str: string): string {
         .join(" ");
 }
 
+// ---------------------------------------------------------------------------
+// High-Tech Animated SVG Anatomy Thumbnail with Fallback
+// ---------------------------------------------------------------------------
+function ExerciseThumbnail({ ex }: { ex: RawExercise }) {
+    const [hasError, setHasError] = useState(false);
+    const mediaSrc = ex.img
+        ? `https://cdn.jsdelivr.net/gh/DuarteSantos8/openGym@main/catalogue/media/still/${ex.img}`
+        : null;
+
+    if (!mediaSrc || hasError) {
+        return (
+            <div className="w-full h-full flex flex-col items-center justify-center p-3 relative overflow-hidden bg-gradient-to-b from-[#161820] via-[#121318] to-[#0d0e12]">
+                {/* Tech Radar Grid */}
+                <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#00ff87_1px,transparent_1px)] [background-size:12px_12px]" />
+
+                {/* Looping Pulse Radar Ring & Vector Anatomy */}
+                <div className="relative flex items-center justify-center mb-1.5 z-10">
+                    <div className="absolute w-14 h-14 rounded-full border border-[#00ff87]/30 animate-ping pointer-events-none" />
+                    <div className="w-12 h-12 rounded-full border border-[#00ff87]/50 bg-[#00ff87]/10 flex items-center justify-center shadow-[0_0_15px_rgba(0,255,135,0.25)]">
+                        <svg
+                            className="w-6 h-6 text-[#00ff87]"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        >
+                            <circle cx="12" cy="5" r="2.5" />
+                            <path d="M9 22v-6.5l-2-3 2.5-4.5h5L17 12.5l-2 3V22" />
+                            <circle cx="12" cy="11" r="1.5" fill="#00ff87" />
+                        </svg>
+                    </div>
+                </div>
+
+                <span className="text-[10px] font-bold tracking-wider text-[#00ff87] uppercase z-10 font-mono truncate max-w-[90%] text-center">
+                    {ex.tg || ex.bp}
+                </span>
+                <span className="text-[9px] text-zinc-500 font-mono tracking-tight z-10">
+                    ANATOMICAL CUES
+                </span>
+            </div>
+        );
+    }
+
+    return (
+        <img
+            src={mediaSrc}
+            alt={ex.n}
+            loading="lazy"
+            onError={() => setHasError(true)}
+            className="w-full h-full object-contain scale-110 will-change-transform transition-transform duration-300 group-hover:scale-115"
+        />
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Detail Modal Media & Interactive Tactical Cues with Rest Timer
+// ---------------------------------------------------------------------------
+function ExerciseModalPreview({ ex }: { ex: RawExercise }) {
+    const [videoError, setVideoError] = useState(false);
+    const [viewMode, setViewMode] = useState<"video" | "cues">("video");
+    const [restTimer, setRestTimer] = useState<number | null>(null);
+    const [activeTimerPreset, setActiveTimerPreset] = useState<number>(60);
+    const [timerRunning, setTimerRunning] = useState(false);
+
+    // Reset media error when active exercise switches
+    useEffect(() => {
+        setVideoError(false);
+        setViewMode("video");
+        setTimerRunning(false);
+        setRestTimer(null);
+    }, [ex.id]);
+
+    // Rest Timer Countdown logic
+    useEffect(() => {
+        let interval: any = null;
+        if (timerRunning && restTimer !== null && restTimer > 0) {
+            interval = setInterval(() => {
+                setRestTimer((prev) => (prev !== null && prev > 0 ? prev - 1 : 0));
+            }, 1000);
+        } else if (restTimer === 0) {
+            setTimerRunning(false);
+        }
+        return () => clearInterval(interval);
+    }, [timerRunning, restTimer]);
+
+    const startTimer = (seconds: number) => {
+        setActiveTimerPreset(seconds);
+        setRestTimer(seconds);
+        setTimerRunning(true);
+    };
+
+    const resetTimer = () => {
+        setTimerRunning(false);
+        setRestTimer(null);
+    };
+
+    const clipSrc = ex.gif
+        ? `https://cdn.jsdelivr.net/gh/DuarteSantos8/openGym@main/catalogue/media/clip/${ex.gif}`
+        : null;
+    const stillSrc = ex.img
+        ? `https://cdn.jsdelivr.net/gh/DuarteSantos8/openGym@main/catalogue/media/still/${ex.img}`
+        : null;
+
+    // Tactical cues tailored to target anatomy
+    const getCues = () => {
+        const bp = (ex.bp || "").toLowerCase();
+        const tg = (ex.tg || "").toLowerCase();
+
+        if (bp.includes("chest") || tg.includes("pectoralis")) {
+            return [
+                "Scapular Retraction: Pin shoulder blades down and back before initiation.",
+                "Eccentric Control: Lower under tension for 3 seconds to maximize mechanical stretch.",
+                "Concentric Drive: Squeeze through inner chest fibers without locking elbows out rigidly."
+            ];
+        }
+        if (bp.includes("back") || tg.includes("latissimus") || tg.includes("trapezius")) {
+            return [
+                "Elbow Path: Lead movement with elbows driven backward rather than wrist flexion.",
+                "Neutral Spine: Brace anterior core firmly; avoid jerky lumbar hyperextension.",
+                "Peak Squeeze: Hold 1-second isometric pause at contraction to trigger lat recruitment."
+            ];
+        }
+        if (bp.includes("legs") || bp.includes("upper legs") || tg.includes("quadriceps") || tg.includes("glutes")) {
+            return [
+                "Joint Alignment: Track knees symmetrically in direction of second toe throughout.",
+                "Full Kinetic Depth: Descend until hip crease breaks parallel while maintaining flat foot pressure.",
+                "Explosive Drive: Push through midfoot and heel, aggressively locking hips at peak."
+            ];
+        }
+        if (bp.includes("shoulders") || tg.includes("delts")) {
+            return [
+                "Trap Neutrality: Avoid shrugging upper trapezius; isolate lateral and anterior heads.",
+                "Smooth Arc: Maintain slight elbow bend and smooth cadence along scapular plane.",
+                "Controlled Deceleration: Resist the negative descent to guard shoulder impingement."
+            ];
+        }
+        if (bp.includes("arms") || tg.includes("biceps") || tg.includes("triceps")) {
+            return [
+                "Fixed Pivot Point: Anchor elbows against torso to prevent momentum transfer.",
+                "Supination / Extension: Emphasize terminal lockout for complete peak tension.",
+                "Tension Maintenance: Never let weight slam at bottom; sustain loaded muscle tension."
+            ];
+        }
+        return [
+            "Braced Kinetic Chain: Keep abdominal wall pressurized and neutral head alignment.",
+            "Execution Tempo: 3s controlled lowering, 1s transition pause, explosive effort.",
+            "Rhythmic Breathing: Inhale during eccentric stretch; exhale on peak contraction drive."
+        ];
+    };
+
+    const tacticalCues = getCues();
+    const showInteractiveCues = videoError || !clipSrc || viewMode === "cues";
+
+    return (
+        <div className="space-y-4">
+            {/* View Mode Toggle Pill (Video vs Tactical Cues) */}
+            {clipSrc && !videoError && (
+                <div className="flex items-center justify-between bg-[#101216] border border-zinc-800 p-1 rounded-xl">
+                    <button
+                        onClick={() => setViewMode("video")}
+                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${viewMode === "video"
+                                ? "bg-[#1b1e26] text-[#00ff87] border border-[#00ff87]/30 shadow"
+                                : "text-zinc-400 hover:text-white"
+                            }`}
+                    >
+                        <span>🎥</span>
+                        <span>Video Execution</span>
+                    </button>
+                    <button
+                        onClick={() => setViewMode("cues")}
+                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${viewMode === "cues"
+                                ? "bg-[#1b1e26] text-[#00ff87] border border-[#00ff87]/30 shadow"
+                                : "text-zinc-400 hover:text-white"
+                            }`}
+                    >
+                        <span>⚡</span>
+                        <span>Tactical Cues & Timer</span>
+                    </button>
+                </div>
+            )}
+
+            {/* Media Box: Looping Execution or Stylized Tactical Preview */}
+            <div className="relative w-full aspect-square max-h-[350px] bg-[#0c0d10] rounded-2xl border border-zinc-800/90 flex items-center justify-center p-3 overflow-hidden shadow-2xl">
+                {!showInteractiveCues ? (
+                    <>
+                        <video
+                            src={clipSrc || ""}
+                            poster={stillSrc || undefined}
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            onError={() => setVideoError(true)}
+                            className="w-full h-full object-contain pointer-events-none"
+                            style={{
+                                imageRendering: "crisp-edges",
+                                filter: "contrast(1.15) saturate(1.15) brightness(1.02)",
+                                WebkitBackfaceVisibility: "hidden",
+                                transform: "translateZ(0)",
+                            }}
+                        />
+                        <span className="absolute bottom-3 left-3 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-black/80 text-zinc-300 backdrop-blur-sm border border-zinc-800 flex items-center gap-1 z-10 pointer-events-none">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#00ff87] animate-pulse" />
+                            Looping Execution Animation
+                        </span>
+                    </>
+                ) : (
+                    /* High-Tech Stylized Interactive Workout Preview */
+                    <div className="w-full h-full flex flex-col justify-between p-4 relative z-10 bg-gradient-to-br from-[#12141a] via-[#0d0f13] to-[#090a0d] rounded-xl border border-zinc-800/80">
+                        {/* Background Radar Rings */}
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
+                            <div className="w-48 h-48 rounded-full border border-[#00ff87] animate-ping" />
+                            <div className="absolute w-36 h-36 rounded-full border border-[#00ff87]/40" />
+                            <div className="absolute w-20 h-20 rounded-full border border-[#00ff87]/60" />
+                        </div>
+
+                        {/* Top Stimulus Header */}
+                        <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2 z-10">
+                            <div className="flex items-center gap-2">
+                                <span className="w-2.5 h-2.5 rounded-full bg-[#00ff87] shadow-[0_0_8px_#00ff87]" />
+                                <span className="text-[11px] font-mono font-bold tracking-wider text-white uppercase">
+                                    Primary Stimulus Target: <span className="text-[#00ff87]">{ex.tg || ex.bp}</span>
+                                </span>
+                            </div>
+                            <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-[#1b1c22] text-zinc-400 border border-zinc-800 uppercase">
+                                {ex.bp}
+                            </span>
+                        </div>
+
+                        {/* Tactical Movement Cues */}
+                        <div className="space-y-2 py-2 z-10">
+                            <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#00ff87] flex items-center gap-1">
+                                <span>🎯</span> Biomechanical Cues
+                            </span>
+                            <div className="space-y-1.5">
+                                {tacticalCues.map((cue, idx) => (
+                                    <div
+                                        key={idx}
+                                        className="text-[11px] leading-relaxed text-zinc-300 bg-[#15171e]/80 border border-zinc-800/60 rounded-lg px-2.5 py-1.5 flex items-start gap-2"
+                                    >
+                                        <span className="text-[#00ff87] font-bold font-mono">0{idx + 1}</span>
+                                        <span>{cue}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Set Rest Timer Controller */}
+                        <div className="pt-2 border-t border-zinc-800/80 z-10 flex flex-col sm:flex-row items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] font-mono text-zinc-400 uppercase">Rest Interval:</span>
+                                {[30, 60, 90].map((s) => (
+                                    <button
+                                        key={s}
+                                        onClick={() => startTimer(s)}
+                                        className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-all ${activeTimerPreset === s && timerRunning
+                                                ? "bg-[#00ff87] text-black shadow-[0_0_8px_rgba(0,255,135,0.4)]"
+                                                : "bg-[#1b1c22] hover:bg-zinc-800 text-zinc-300 border border-zinc-800"
+                                            }`}
+                                    >
+                                        {s}s
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                {restTimer !== null ? (
+                                    <div className="flex items-center gap-2">
+                                        <span className={`text-xs font-mono font-black ${restTimer === 0 ? "text-amber-400 animate-pulse" : "text-[#00ff87]"}`}>
+                                            {restTimer === 0 ? "🔔 SET READY!" : `⏱️ ${restTimer}s remaining`}
+                                        </span>
+                                        <button
+                                            onClick={resetTimer}
+                                            className="text-[10px] text-zinc-500 hover:text-white underline cursor-pointer"
+                                        >
+                                            Reset
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => startTimer(60)}
+                                        className="text-[10px] font-bold px-2.5 py-1 rounded bg-[#1b1d24] hover:bg-[#232630] text-[#00ff87] border border-[#00ff87]/30 transition-all cursor-pointer"
+                                    >
+                                        ⚡ Start 60s Rest Timer
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Main Exercise Engine Page
+// ---------------------------------------------------------------------------
 export default function ExerciseEnginePage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedBodyPart, setSelectedBodyPart] = useState("All");
@@ -100,137 +400,117 @@ export default function ExerciseEnginePage() {
     };
 
     return (
-        <div className="min-h-screen bg-[#0e0e10] text-[#f4f4f5] pt-8 sm:pt-10 pb-28 px-4 sm:px-8 font-sans selection:bg-[#00ff87]/30">
-            <div className="max-w-7xl mx-auto space-y-6">
-                {/* Header & Quick Navigation */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800/80 pb-5">
-                    <div>
-                        <Link
-                            href="/portal"
-                            className="text-xs text-zinc-400 hover:text-white transition-colors flex items-center gap-1.5 mb-2 font-medium"
-                        >
-                            <span>←</span> Back to Athlete Hub
+        <div className="min-h-screen bg-[#0e0e10] text-[#f4f4f5] p-6 lg:p-10 font-sans selection:bg-[#00ff87]/30">
+            <div className="max-w-6xl mx-auto space-y-8">
+                {/* Top Breadcrumb Navigation */}
+                <div className="flex items-center justify-between border-b border-zinc-800 pb-5">
+                    <div className="flex items-center gap-2 text-xs text-zinc-400">
+                        <Link href="/portal" className="hover:text-white transition-colors">
+                            ← Athlete Portal
                         </Link>
-                        <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-                            5,600+ <span className="text-[#00ff87]">EXERCISE ENGINE</span>
-                        </h1>
-                        <p className="text-xs text-zinc-400 mt-1 max-w-2xl">
-                            Complete openGym exercise catalog with high-precision anatomy tags, verified equipment classifications,
-                            and live frame-by-frame illustration and animation streaming.
-                        </p>
+                        <span>/</span>
+                        <span className="text-[#00ff87] font-semibold">Exercise Engine</span>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <Link
-                            href="/portal/stats"
-                            className="bg-[#141518] hover:bg-[#1b1c20] border border-zinc-800 rounded-xl px-4 py-2 text-xs font-semibold text-zinc-300 transition-all flex items-center gap-2 shadow-sm"
-                        >
-                            <span>🧬</span> View Muscle Heatmap
-                        </Link>
-                        <div className="bg-[#141518] border border-zinc-800 rounded-xl px-4 py-2 text-right shadow-sm">
-                            <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider block">
-                                In Library
-                            </span>
-                            <span className="text-base font-black text-[#00ff87] font-mono">
-                                5,632 Movements
-                            </span>
-                        </div>
+                    <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-[#00ff87] animate-pulse" />
+                        <span className="text-xs font-mono text-zinc-400">
+                            {filteredExercises.length.toLocaleString()} Active Movements
+                        </span>
                     </div>
                 </div>
 
-                {/* Filter & Search Control Panel */}
-                <div className="bg-[#141518] border border-zinc-800/80 rounded-2xl p-5 space-y-4 shadow-xl">
-                    {/* Search Bar */}
+                {/* Hero Header */}
+                <div>
+                    <span className="text-[10px] font-bold tracking-widest text-[#00ff87] uppercase">
+                        IronCore Biomechanics Library
+                    </span>
+                    <h1 className="text-3xl font-extrabold tracking-tight mt-1">
+                        5,600+ Exercise Engine & Form Cues
+                    </h1>
+                    <p className="text-xs text-zinc-400 mt-1 max-w-2xl">
+                        Filter by anatomical muscle target, barbell, dumbbell, cable, machine, and calisthenics.
+                        Tap any movement card to inspect looped animation cues and set timers.
+                    </p>
+                </div>
+
+                {/* Controls Bar: Search + Filter Chips */}
+                <div className="bg-[#141518] border border-zinc-800 rounded-2xl p-5 space-y-4 shadow-xl">
+                    {/* Search Input */}
                     <div className="relative">
-                        <span className="absolute left-3.5 top-3 text-zinc-500 text-sm">🔍</span>
                         <input
                             type="text"
-                            placeholder="Search 5,632 exercises by name or muscle (e.g. Bench, Romanian Deadlift, Lat Pulldown, Biceps)..."
+                            placeholder="Search by exercise name, target muscle (e.g. lats, quads, bench press)..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-[#1b1c20] border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#00ff87] transition-colors"
+                            className="w-full bg-[#1b1c20] border border-zinc-800 rounded-xl px-4 py-3 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#00ff87] transition-colors"
                         />
                         {searchQuery && (
                             <button
                                 onClick={() => setSearchQuery("")}
-                                className="absolute right-3.5 top-2.5 text-zinc-500 hover:text-white text-xs"
+                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white text-xs"
                             >
-                                Clear
+                                ✕ Clear
                             </button>
                         )}
                     </div>
 
-                    {/* Filter Pill Rows */}
-                    <div className="space-y-3 pt-1">
-                        {/* Body Part Filter */}
-                        <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:thin] [scrollbar-color:#3f3f46_#141518]">
-                            <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 flex-shrink-0 mr-1">
-                                Muscle:
-                            </span>
-                            {BODY_PART_OPTIONS.map((bp) => (
-                                <button
-                                    key={bp.value}
-                                    onClick={() => setSelectedBodyPart(bp.value)}
-                                    className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-all border whitespace-nowrap flex-shrink-0 ${
-                                        selectedBodyPart === bp.value
-                                            ? "bg-[#00ff87] text-black border-[#00ff87] font-bold shadow-sm shadow-[#00ff87]/20"
-                                            : "bg-[#1b1c20] text-zinc-400 border-zinc-800 hover:text-white"
-                                    }`}
-                                >
-                                    {bp.label}
-                                </button>
-                            ))}
+                    {/* Filter Row 1: Body Part Anatomy Chips */}
+                    <div>
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-2">
+                            Anatomical Muscle Focus
                         </div>
-
-                        {/* Equipment Filter */}
-                        <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:thin] [scrollbar-color:#3f3f46_#141518]">
-                            <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 flex-shrink-0 mr-1">
-                                Gear:
-                            </span>
-                            {EQUIPMENT_OPTIONS.map((eq) => (
-                                <button
-                                    key={eq.value}
-                                    onClick={() => setSelectedEquipment(eq.value)}
-                                    className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-all border whitespace-nowrap flex-shrink-0 ${
-                                        selectedEquipment === eq.value
-                                            ? "bg-zinc-200 text-black border-zinc-200 font-bold"
-                                            : "bg-[#1b1c20] text-zinc-400 border-zinc-800 hover:text-white"
-                                    }`}
-                                >
-                                    {eq.label}
-                                </button>
-                            ))}
+                        <div className="flex flex-wrap gap-1.5">
+                            {BODY_PART_OPTIONS.map((opt) => {
+                                const active = selectedBodyPart === opt.value;
+                                return (
+                                    <button
+                                        key={opt.value}
+                                        onClick={() => setSelectedBodyPart(opt.value)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${active
+                                                ? "bg-[#00ff87] text-black shadow-md shadow-[#00ff87]/20"
+                                                : "bg-[#1b1c20] text-zinc-400 hover:text-white hover:bg-zinc-800 border border-zinc-800/80"
+                                            }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
 
-                    {/* Active Count & Reset Indicator */}
-                    <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-2 border-t border-zinc-800/80">
-                        <span>
-                            Showing <span className="text-[#00ff87] font-mono font-bold">{displayedExercises.length}</span> of{" "}
-                            <span className="text-white font-mono font-bold">{filteredExercises.length.toLocaleString()}</span> filtered exercises
-                        </span>
-                        {(searchQuery || selectedBodyPart !== "All" || selectedEquipment !== "All") && (
-                            <button
-                                onClick={() => {
-                                    setSearchQuery("");
-                                    setSelectedBodyPart("All");
-                                    setSelectedEquipment("All");
-                                }}
-                                className="text-zinc-500 hover:text-[#00ff87] transition-colors underline"
-                            >
-                                Reset all filters
-                            </button>
-                        )}
+                    {/* Filter Row 2: Equipment Modality Chips */}
+                    <div>
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-2">
+                            Equipment Modality
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                            {EQUIPMENT_OPTIONS.map((opt) => {
+                                const active = selectedEquipment === opt.value;
+                                return (
+                                    <button
+                                        key={opt.value}
+                                        onClick={() => setSelectedEquipment(opt.value)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${active
+                                                ? "bg-[#00ff87] text-black shadow-md shadow-[#00ff87]/20"
+                                                : "bg-[#1b1c20] text-zinc-400 hover:text-white hover:bg-zinc-800 border border-zinc-800/80"
+                                            }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
 
-                {/* Exercises Grid */}
+                {/* Exercises Responsive Grid */}
                 {displayedExercises.length === 0 ? (
-                    <div className="bg-[#141518] border border-zinc-800/80 rounded-2xl p-12 text-center space-y-3">
-                        <span className="text-3xl block">🔍</span>
-                        <h3 className="text-base font-bold text-white">No exercises found</h3>
-                        <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-                            No movements matched &quot;{searchQuery}&quot; with your selected equipment and body part filters.
+                    <div className="bg-[#141518] border border-zinc-800 rounded-2xl p-12 text-center space-y-3">
+                        <span className="text-3xl">🔍</span>
+                        <h3 className="text-base font-bold text-white">No Exercises Match Current Filters</h3>
+                        <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+                            Try resetting your search query or selecting &quot;All Anatomy&quot; and &quot;All Equipment&quot;.
                         </p>
                         <button
                             onClick={() => {
@@ -238,13 +518,13 @@ export default function ExerciseEnginePage() {
                                 setSelectedBodyPart("All");
                                 setSelectedEquipment("All");
                             }}
-                            className="bg-[#1b1c20] hover:bg-zinc-800 text-[#00ff87] border border-zinc-800 px-4 py-2 rounded-xl text-xs font-semibold transition-all"
+                            className="bg-[#1b1c20] hover:bg-zinc-800 text-[#00ff87] text-xs font-semibold px-4 py-2 rounded-xl border border-zinc-800 transition-colors"
                         >
-                            Clear Filters
+                            Reset All Filters
                         </button>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {displayedExercises.map((ex) => (
                             <div
                                 key={ex.id}
@@ -268,18 +548,9 @@ export default function ExerciseEnginePage() {
                                         </span>
                                     </div>
 
-                                    {/* Exercise Still Illustration Thumbnail */}
+                                    {/* Exercise Still Illustration Thumbnail with Fallback */}
                                     <div className="w-full h-36 bg-[#121316] rounded-xl border border-zinc-800/80 flex items-center justify-center p-2 overflow-hidden relative shadow-inner">
-                                        {ex.img ? (
-                                            <img
-                                                src={`/api/media/still/${ex.img}`}
-                                                alt={ex.n}
-                                                loading="lazy"
-                                                className="w-full h-full object-contain scale-110 will-change-transform transition-transform duration-300 group-hover:scale-115"
-                                            />
-                                        ) : (
-                                            <span className="text-zinc-600 text-xs">No preview</span>
-                                        )}
+                                        <ExerciseThumbnail ex={ex} />
                                         <span className="absolute bottom-2 right-2 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-black/70 text-zinc-300 backdrop-blur-sm border border-zinc-800">
                                             {ex.cat || "Movement"}
                                         </span>
@@ -357,51 +628,14 @@ export default function ExerciseEnginePage() {
                             </div>
                             <button
                                 onClick={() => setActiveModalExercise(null)}
-                                className="text-zinc-500 hover:text-white text-lg px-2 py-1 transition-colors"
+                                className="text-zinc-500 hover:text-white text-lg px-2 py-1 transition-colors cursor-pointer"
                             >
                                 ✕
                             </button>
                         </div>
 
-                        {/* Looping 3-Second Movement Video / Animation */}
-                        <div className="relative w-full aspect-square max-h-[360px] bg-[#0c0d10] rounded-2xl border border-zinc-800/80 flex items-center justify-center p-2 overflow-hidden shadow-inner">
-                            {activeModalExercise.gif ? (
-                                <video
-                                    src={`/api/media/clip/${activeModalExercise.gif}`}
-                                    poster={activeModalExercise.img ? `/api/media/still/${activeModalExercise.img}` : undefined}
-                                    autoPlay
-                                    loop
-                                    muted
-                                    playsInline
-                                    className="w-full h-full object-contain pointer-events-none"
-                                    style={{
-                                        imageRendering: "crisp-edges",
-                                        filter: "contrast(1.15) saturate(1.15) brightness(1.02)",
-                                        WebkitBackfaceVisibility: "hidden",
-                                        transform: "translateZ(0)",
-                                    }}
-                                />
-                            ) : activeModalExercise.img ? (
-                                <img
-                                    src={`/api/media/still/${activeModalExercise.img}`}
-                                    alt={activeModalExercise.n}
-                                    className="w-full h-full object-contain pointer-events-none"
-                                    style={{
-                                        imageRendering: "crisp-edges",
-                                        filter: "contrast(1.15) saturate(1.15) brightness(1.02)",
-                                        WebkitBackfaceVisibility: "hidden",
-                                        transform: "translateZ(0)",
-                                    }}
-                                />
-                            ) : (
-                                <span className="text-zinc-500 text-xs">No media available</span>
-                            )}
-
-                            <span className="absolute bottom-3 left-3 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-black/80 text-zinc-300 backdrop-blur-sm border border-zinc-800 flex items-center gap-1 z-10 pointer-events-none">
-                                <span className="w-1.5 h-1.5 rounded-full bg-[#00ff87] animate-pulse" />
-                                Looping Vector Execution
-                            </span>
-                        </div>
+                        {/* Looping 3-Second Movement Video / Animation with Interactive Fallback */}
+                        <ExerciseModalPreview ex={activeModalExercise} />
 
                         {/* Anatomical Stimulus Metrics */}
                         <div className="space-y-3 text-xs">
@@ -454,7 +688,7 @@ export default function ExerciseEnginePage() {
                         <div className="pt-3 border-t border-zinc-800 flex items-center justify-between gap-3">
                             <button
                                 onClick={() => handleCopy(activeModalExercise.n)}
-                                className="px-3.5 py-2 rounded-xl bg-[#1b1c20] hover:bg-zinc-800 text-zinc-300 text-xs font-semibold border border-zinc-800 transition-colors flex items-center gap-1.5"
+                                className="px-3.5 py-2 rounded-xl bg-[#1b1c20] hover:bg-zinc-800 text-zinc-300 text-xs font-semibold border border-zinc-800 transition-colors flex items-center gap-1.5 cursor-pointer"
                             >
                                 <span>📋</span>
                                 <span>{copiedName ? "Copied!" : "Copy Movement Name"}</span>
@@ -462,7 +696,7 @@ export default function ExerciseEnginePage() {
 
                             <button
                                 onClick={() => setActiveModalExercise(null)}
-                                className="px-5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-semibold transition-colors"
+                                className="px-5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-semibold transition-colors cursor-pointer"
                             >
                                 Done
                             </button>

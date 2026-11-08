@@ -63,13 +63,11 @@ const DEFAULT_MEMBER: Member = {
 };
 
 export default function MemberPortalDashboard() {
-    const [member, setMember] = useState<Member | null>(null);
-    const [loading, setLoading] = useState<boolean>(true);
+    const [member, setMember] = useState<Member>(DEFAULT_MEMBER);
     const [targetWeight, setTargetWeight] = useState<number>(70);
     const [loggedWeight, setLoggedWeight] = useState<string>("");
     const [hasCheckedInToday, setHasCheckedInToday] = useState<boolean>(false);
-    const [weightLogs, setWeightLogs] = useState<WeightEntry[]>([]);
-    const [isMounted, setIsMounted] = useState<boolean>(false);
+    const [weightLogs, setWeightLogs] = useState<WeightEntry[]>(DEFAULT_MEMBER.weightHistory || []);
 
     // Chat Drawer States
     const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
@@ -80,13 +78,12 @@ export default function MemberPortalDashboard() {
 
     // 1. Resilient active member & session loader with fallback
     useEffect(() => {
-        setIsMounted(true);
         let activeMember: Member = DEFAULT_MEMBER;
 
         try {
             // Read active member & session from localStorage
-            const storedSession = localStorage.getItem("ironcore_member_session");
-            const storedActive = localStorage.getItem("ironcore_active_member");
+            const storedSession = typeof window !== "undefined" ? localStorage.getItem("ironcore_member_session") : null;
+            const storedActive = typeof window !== "undefined" ? localStorage.getItem("ironcore_active_member") : null;
 
             if (storedActive) {
                 try {
@@ -102,7 +99,7 @@ export default function MemberPortalDashboard() {
                 }
             } else {
                 // If ironcore_active_member is absent, check ironcore_members_db
-                const storedMembers = localStorage.getItem("ironcore_members_db");
+                const storedMembers = typeof window !== "undefined" ? localStorage.getItem("ironcore_members_db") : null;
                 if (storedMembers) {
                     try {
                         const membersList: Member[] = JSON.parse(storedMembers);
@@ -119,11 +116,13 @@ export default function MemberPortalDashboard() {
             }
 
             // Sync back to localStorage for persistence
-            if (!storedActive) {
-                localStorage.setItem("ironcore_active_member", JSON.stringify(activeMember));
-            }
-            if (!storedSession) {
-                localStorage.setItem("ironcore_member_session", "authenticated");
+            if (typeof window !== "undefined") {
+                if (!storedActive) {
+                    localStorage.setItem("ironcore_active_member", JSON.stringify(activeMember));
+                }
+                if (!storedSession) {
+                    localStorage.setItem("ironcore_member_session", "authenticated");
+                }
             }
 
             setMember(activeMember);
@@ -140,29 +139,34 @@ export default function MemberPortalDashboard() {
             setWeightLogs(defaultLogs);
 
             // Check-in status check for today
-            const checkinDate = localStorage.getItem("ironcore_last_checkin_date");
-            const today = new Date().toISOString().split("T")[0];
-            if (checkinDate === today) {
-                setHasCheckedInToday(true);
+            if (typeof window !== "undefined") {
+                const checkinDate = localStorage.getItem("ironcore_last_checkin_date");
+                const today = new Date().toISOString().split("T")[0];
+                if (checkinDate === today) {
+                    setHasCheckedInToday(true);
+                }
             }
 
             // Load or initialize member chat thread from CRM chat roster
             const memberName = activeMember.name || "Kshitij Pilankar";
-            const savedRoster = localStorage.getItem("ironcore_crm_chat_roster");
-
-            if (savedRoster) {
-                try {
-                    const roster: ChatMember[] = JSON.parse(savedRoster);
-                    const matching = roster.find(
-                        (m) => m.name.toLowerCase() === memberName.toLowerCase()
-                    );
-                    if (matching && matching.messages && matching.messages.length > 0) {
-                        setChatMessages(matching.messages);
-                    } else {
+            if (typeof window !== "undefined") {
+                const savedRoster = localStorage.getItem("ironcore_crm_chat_roster");
+                if (savedRoster) {
+                    try {
+                        const roster: ChatMember[] = JSON.parse(savedRoster);
+                        const matching = roster.find(
+                            (m) => m.name.toLowerCase() === memberName.toLowerCase()
+                        );
+                        if (matching && matching.messages && matching.messages.length > 0) {
+                            setChatMessages(matching.messages);
+                        } else {
+                            initDefaultChat(memberName);
+                        }
+                    } catch (err) {
+                        console.error("Failed to load chat roster", err);
                         initDefaultChat(memberName);
                     }
-                } catch (err) {
-                    console.error("Failed to load chat roster", err);
+                } else {
                     initDefaultChat(memberName);
                 }
             } else {
@@ -174,8 +178,6 @@ export default function MemberPortalDashboard() {
             setTargetWeight(70);
             setWeightLogs(DEFAULT_MEMBER.weightHistory || []);
             initDefaultChat(DEFAULT_MEMBER.name);
-        } finally {
-            setLoading(false);
         }
     }, []);
 
@@ -341,16 +343,8 @@ export default function MemberPortalDashboard() {
     };
 
     const directWhatsAppUrl = `https://wa.me/${currentGym.phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(
-        `Hi ${currentGym.name} Coach, this is ${member ? member.name : "an athlete"} (${member ? member.plan : "Member"}). I need assistance with my workout plan & desk support.`
+        `Hi ${currentGym.name} Coach, this is ${member.name} (${member.plan}). I need assistance with my workout plan & desk support.`
     )}`;
-
-    if (!isMounted || loading || !member) {
-        return (
-            <div className="min-h-screen bg-[#0e0e10] flex items-center justify-center text-zinc-400 text-sm">
-                Loading Athlete Portal...
-            </div>
-        );
-    }
 
     const latestWeight = weightLogs.length > 0 ? weightLogs[0].weightKg : 72;
     const weightDifference = (latestWeight - targetWeight).toFixed(1);

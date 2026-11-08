@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 
+const CDN_MEDIA_BASE = "https://cdn.jsdelivr.net/gh/DuarteSantos8/openGym@main/catalogue/media";
+
 export async function GET(
     req: NextRequest,
     context: { params: Promise<{ type: string; filename: string }> }
@@ -15,8 +17,9 @@ export async function GET(
     const mediaDir = path.resolve(process.cwd(), "../workout-engine/catalogue/media", safeType);
     const filePath = path.join(mediaDir, safeFilename);
 
+    // If local file does not exist (e.g. deployed to Vercel), redirect to ultra-fast jsDelivr CDN
     if (!fs.existsSync(filePath)) {
-        return new NextResponse("Media file not found", { status: 404 });
+        return NextResponse.redirect(`${CDN_MEDIA_BASE}/${safeType}/${safeFilename}`, 307);
     }
 
     const stat = fs.statSync(filePath);

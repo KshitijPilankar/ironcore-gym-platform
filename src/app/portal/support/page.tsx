@@ -50,14 +50,12 @@ const DEFAULT_MEMBER: Member = {
 };
 
 export default function AthleteSupportFullPage() {
-    const [member, setMember] = useState<Member | null>(null);
+    const [member, setMember] = useState<Member>(DEFAULT_MEMBER);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputText, setInputText] = useState("");
-    const [isMounted, setIsMounted] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        setIsMounted(true);
         let activeMember: Member = DEFAULT_MEMBER;
 
         try {
@@ -184,16 +182,8 @@ export default function AthleteSupportFullPage() {
     };
 
     const directWhatsAppUrl = `https://wa.me/${currentGym.phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(
-        `Hi ${currentGym.name} Coach, this is ${member ? member.name : "an athlete"} (${member ? member.plan : "Member"}). I need assistance with my workout plan & desk support.`
+        `Hi ${currentGym.name} Coach, this is ${member.name} (${member.plan}). I need assistance with my workout plan & desk support.`
     )}`;
-
-    if (!isMounted || !member) {
-        return (
-            <div className="min-h-screen bg-[#0e0e10] flex items-center justify-center text-zinc-400 text-sm">
-                Loading Athlete Support...
-            </div>
-        );
-    }
 
     return (
         <div className="min-h-screen bg-[#0e0e10] text-[#f4f4f5] pt-8 sm:pt-10 pb-20 px-4 sm:px-8 font-sans selection:bg-[#00ff87]/30">
