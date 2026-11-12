@@ -5,7 +5,7 @@ export const currentGym = {
     phone: "919004884885",
     primaryColor: "#10b981",
     pricing: {
-        standard: "1,499",
+        standard: "1",
         smartPass: "1,999",
     },
 };

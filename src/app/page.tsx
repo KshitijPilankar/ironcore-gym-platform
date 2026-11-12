@@ -203,7 +203,7 @@ export default function GymHomePage() {
 
               {/* Razorpay Integrated Button - Standard Plan */}
               <RazorpayPaymentBtn
-                amount={1499}
+                amount={1}
                 planName="Standard Gym Plan"
                 buttonText="Get Started (Pay Now)"
                 memberPhone={phone}
