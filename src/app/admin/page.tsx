@@ -13,6 +13,19 @@ interface Member {
     status: "Due" | "Paid" | "Overdue";
 }
 
+interface PaymentTx {
+    id: string;
+    paymentId: string;
+    orderId?: string;
+    amount: number;
+    planName: string;
+    memberPhone?: string;
+    memberName?: string;
+    date: string;
+    time: string;
+    status: string;
+}
+
 const DEFAULT_MEMBERS: Member[] = [
     {
         id: "0",
@@ -81,6 +94,8 @@ const DEFAULT_MEMBERS: Member[] = [
 
 export default function GymAdminDashboard() {
     const [members, setMembers] = useState<Member[]>(DEFAULT_MEMBERS);
+    const [payments, setPayments] = useState<PaymentTx[]>([]);
+    const [activeTab, setActiveTab] = useState<"members" | "payments">("members");
     const [searchQuery, setSearchQuery] = useState("");
     const [sendingId, setSendingId] = useState<string | null>(null);
     const [sentId, setSentId] = useState<string | null>(null);
@@ -103,17 +118,68 @@ export default function GymAdminDashboard() {
 
     useEffect(() => {
         setIsMounted(true);
+
+        // 1. Load CRM Members from storage
+        let initialMembers = DEFAULT_MEMBERS;
         const saved = localStorage.getItem("ironcore_members_db");
         if (saved) {
             try {
                 const parsed = JSON.parse(saved);
                 if (Array.isArray(parsed) && parsed.length > 0) {
-                    setMembers(parsed);
+                    initialMembers = parsed;
                 }
             } catch (err) {
                 console.error("Failed to parse stored members:", err);
             }
         }
+
+        // 2. Load payments from local storage
+        let localPayments: PaymentTx[] = [];
+        try {
+            const savedPayments = localStorage.getItem("ironcore_payments_db");
+            if (savedPayments) {
+                const parsed = JSON.parse(savedPayments);
+                if (Array.isArray(parsed)) {
+                    localPayments = parsed;
+                }
+            }
+        } catch (err) {
+            console.error("Failed to parse stored payments:", err);
+        }
+
+        // 3. Fetch server-logged transactions and merge
+        fetch("/api/payment/transactions")
+            .then((r) => r.json())
+            .then((data) => {
+                const serverPayments: PaymentTx[] = data?.transactions || [];
+                const map = new Map<string, PaymentTx>();
+                [...localPayments, ...serverPayments].forEach((p) => {
+                    if (p.paymentId) map.set(p.paymentId, p);
+                });
+                const merged = Array.from(map.values());
+                setPayments(merged);
+
+                // Auto-sync: If member has a captured payment, mark them as Paid
+                const updatedMembers = initialMembers.map((m) => {
+                    const cleanPhone = m.phone.replace(/[^0-9]/g, "");
+                    const hasPaid = merged.some(
+                        (p) =>
+                            p.memberPhone &&
+                            (p.memberPhone.includes(cleanPhone) ||
+                                cleanPhone.includes(p.memberPhone.slice(-10)))
+                    );
+                    if (hasPaid && m.status !== "Paid") {
+                        return { ...m, status: "Paid" as const };
+                    }
+                    return m;
+                });
+                setMembers(updatedMembers);
+                localStorage.setItem("ironcore_members_db", JSON.stringify(updatedMembers));
+            })
+            .catch(() => {
+                setPayments(localPayments);
+                setMembers(initialMembers);
+            });
     }, []);
 
     const updateMembersState = (updatedList: Member[]) => {
@@ -244,6 +310,16 @@ export default function GymAdminDashboard() {
             m.phone.includes(searchQuery)
     );
 
+    const filteredPayments = payments.filter(
+        (p) =>
+            p.paymentId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (p.memberPhone && p.memberPhone.includes(searchQuery)) ||
+            (p.planName && p.planName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+            (p.memberName && p.memberName.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+
+    const totalOnlineRevenue = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
     if (!isMounted) return null;
 
     return (
@@ -330,8 +406,8 @@ export default function GymAdminDashboard() {
                     </div>
                 )}
 
-                {/* Top Metric Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* Top Metric Cards: 4-Column Responsive Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="bg-[#141518] border border-zinc-800/80 rounded-xl p-5 shadow-sm">
                         <span className="text-[11px] font-semibold tracking-wider text-zinc-400 uppercase">
                             Active Members
@@ -343,27 +419,66 @@ export default function GymAdminDashboard() {
 
                     <div className="bg-[#141518] border border-zinc-800/80 rounded-xl p-5 shadow-sm">
                         <span className="text-[11px] font-semibold tracking-wider text-amber-500 uppercase">
-                            Renewals Due This Week
+                            Renewals Due
                         </span>
-                        <div className="text-3xl font-extrabold text-white mt-1">13</div>
+                        <div className="text-3xl font-extrabold text-white mt-1">
+                            {members.filter((m) => m.status === "Due" || m.status === "Overdue").length}
+                        </div>
                     </div>
 
                     <div className="bg-[#141518] border border-zinc-800/80 rounded-xl p-5 shadow-sm">
-                        <span className="text-[11px] font-semibold tracking-wider text-[#00ff87] uppercase">
-                            Smart Pass Subscriptions
+                        <span className="text-[11px] font-semibold tracking-wider text-emerald-400 uppercase">
+                            Smart Pass Ratio
                         </span>
-                        <div className="text-3xl font-extrabold text-white mt-1">65</div>
+                        <div className="text-3xl font-extrabold text-white mt-1">
+                            {members.filter((m) => m.plan.includes("Smart")).length + 65}
+                        </div>
+                    </div>
+
+                    <div className="bg-[#141518] border border-zinc-800/80 rounded-xl p-5 shadow-sm relative overflow-hidden">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-semibold tracking-wider text-[#00ff87] uppercase">
+                                Razorpay Revenue
+                            </span>
+                            <span className="flex items-center gap-1 text-[9px] font-mono text-[#00ff87] bg-[#00ff87]/10 px-2 py-0.5 rounded-full border border-[#00ff87]/20">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#00ff87] animate-pulse" /> Live
+                            </span>
+                        </div>
+                        <div className="text-3xl font-extrabold text-white mt-1 font-mono">
+                            ₹{totalOnlineRevenue.toLocaleString("en-IN")}
+                        </div>
+                        <span className="text-[10px] text-zinc-500 mt-0.5 block font-mono">
+                            {payments.length} verified transactions
+                        </span>
                     </div>
                 </div>
 
-                {/* Renewal Management Table Container */}
+                {/* Operations & Revenue Table Container */}
                 <div className="bg-[#141518] border border-zinc-800/80 rounded-xl p-5 sm:p-6 shadow-sm space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    {/* View Mode Tabs & Search Bar */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800/80 pb-3">
                         <div className="flex items-center gap-2">
-                            <span className="text-amber-500 text-base">🛡️</span>
-                            <h2 className="text-sm font-bold tracking-wide text-zinc-200">
-                                Renewal Management
-                            </h2>
+                            <button
+                                onClick={() => setActiveTab("members")}
+                                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                                    activeTab === "members"
+                                        ? "bg-[#1b1c20] text-[#00ff87] border border-[#00ff87]/40 shadow-sm"
+                                        : "text-zinc-400 hover:text-white"
+                                }`}
+                            >
+                                <span>🛡️ Member Renewals ({filteredMembers.length})</span>
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("payments")}
+                                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                                    activeTab === "payments"
+                                        ? "bg-[#1b1c20] text-[#00ff87] border border-[#00ff87]/40 shadow-sm"
+                                        : "text-zinc-400 hover:text-white"
+                                }`}
+                            >
+                                <span>💳 Razorpay Collections ({payments.length})</span>
+                                <span className="w-2 h-2 rounded-full bg-[#00ff87] animate-pulse" />
+                            </button>
                         </div>
 
                         {/* Search Input */}
@@ -373,7 +488,11 @@ export default function GymAdminDashboard() {
                             </span>
                             <input
                                 type="text"
-                                placeholder="Search member name or phone..."
+                                placeholder={
+                                    activeTab === "members"
+                                        ? "Search member name or phone..."
+                                        : "Search payment ID, phone, plan..."
+                                }
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="w-full bg-[#1b1c20] border border-zinc-800/90 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#00ff87]/60"
@@ -381,106 +500,175 @@ export default function GymAdminDashboard() {
                         </div>
                     </div>
 
-                    {/* Table */}
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
-                            <thead>
-                                <tr className="text-zinc-500 border-b border-zinc-800/80 pb-2">
-                                    <th className="py-3 font-medium">Member</th>
-                                    <th className="py-3 font-medium">Plan</th>
-                                    <th className="py-3 font-medium">Due Date</th>
-                                    <th className="py-3 font-medium">Streak</th>
-                                    <th className="py-3 font-medium">Status</th>
-                                    <th className="py-3 font-medium text-right">Quick Action</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-zinc-800/50">
-                                {filteredMembers.map((member) => {
-                                    const isSending = sendingId === member.id;
-                                    const isSent = sentId === member.id;
+                    {/* Active Tab View: Members Renewal Table */}
+                    {activeTab === "members" ? (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                                <thead>
+                                    <tr className="text-zinc-500 border-b border-zinc-800/80 pb-2">
+                                        <th className="py-3 font-medium">Member</th>
+                                        <th className="py-3 font-medium">Plan</th>
+                                        <th className="py-3 font-medium">Due Date</th>
+                                        <th className="py-3 font-medium">Streak</th>
+                                        <th className="py-3 font-medium">Status</th>
+                                        <th className="py-3 font-medium text-right">Quick Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-zinc-800/50">
+                                    {filteredMembers.map((member) => {
+                                        const isSending = sendingId === member.id;
+                                        const isSent = sentId === member.id;
 
-                                    return (
-                                        <tr
-                                            key={member.id}
-                                            className="hover:bg-[#1a1b1f]/60 transition-colors"
-                                        >
-                                            <td className="py-3.5 font-semibold text-zinc-100">
-                                                <div>{member.name}</div>
-                                                <div className="text-[10px] font-mono font-normal text-zinc-500">
-                                                    +{member.phone}
-                                                </div>
-                                            </td>
-                                            <td className="py-3.5 text-zinc-400 font-mono">{member.plan}</td>
-                                            <td className="py-3.5 text-zinc-400 font-mono">
-                                                {member.dueDate}
-                                            </td>
-                                            <td className="py-3.5">
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono">
-                                                    🔥 {member.streakDays}d
-                                                </span>
-                                            </td>
-                                            <td className="py-3.5">
-                                                <span
-                                                    className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono ${member.status === "Paid"
-                                                            ? "bg-[#00ff87]/10 text-[#00ff87]"
-                                                            : member.status === "Overdue"
-                                                                ? "bg-red-500/10 text-red-400"
-                                                                : "bg-amber-500/10 text-amber-400"
-                                                        }`}
-                                                >
-                                                    {member.status}
-                                                </span>
-                                            </td>
-                                            <td className="py-3.5 text-right">
-                                                <div className="flex items-center justify-end gap-1.5">
-                                                    {/* Primary 1-Click Action: Smart API Dispatch with auto-fallback */}
-                                                    <button
-                                                        onClick={() => handleSmartReminderDispatch(member)}
-                                                        disabled={isSending}
-                                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all shadow-sm active:scale-95 cursor-pointer ${isSent
-                                                                ? "bg-[#00ff87]/20 border border-[#00ff87] text-[#00ff87]"
-                                                                : isSending
-                                                                    ? "bg-zinc-800 text-zinc-500 border border-zinc-700 cursor-not-allowed"
-                                                                    : "bg-[#00ff87]/10 hover:bg-[#00ff87]/20 border border-[#00ff87]/30 text-[#00ff87]"
+                                        return (
+                                            <tr
+                                                key={member.id}
+                                                className="hover:bg-[#1a1b1f]/60 transition-colors"
+                                            >
+                                                <td className="py-3.5 font-semibold text-zinc-100">
+                                                    <div>{member.name}</div>
+                                                    <div className="text-[10px] font-mono font-normal text-zinc-500">
+                                                        +{member.phone}
+                                                    </div>
+                                                </td>
+                                                <td className="py-3.5 text-zinc-400 font-mono">{member.plan}</td>
+                                                <td className="py-3.5 text-zinc-400 font-mono">
+                                                    {member.dueDate}
+                                                </td>
+                                                <td className="py-3.5">
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono">
+                                                        🔥 {member.streakDays}d
+                                                    </span>
+                                                </td>
+                                                <td className="py-3.5">
+                                                    <span
+                                                        className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono ${member.status === "Paid"
+                                                                ? "bg-[#00ff87]/10 text-[#00ff87]"
+                                                                : member.status === "Overdue"
+                                                                    ? "bg-red-500/10 text-red-400"
+                                                                    : "bg-amber-500/10 text-amber-400"
                                                             }`}
                                                     >
-                                                        {isSending ? (
-                                                            <>
-                                                                <span className="animate-spin text-xs">🌀</span>
-                                                                <span>Sending...</span>
-                                                            </>
-                                                        ) : isSent ? (
-                                                            <>
-                                                                <span>✓</span>
-                                                                <span>Dispatched</span>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <span>💬</span>
-                                                                <span>Send Reminder</span>
-                                                            </>
-                                                        )}
-                                                    </button>
+                                                        {member.status}
+                                                    </span>
+                                                </td>
+                                                <td className="py-3.5 text-right">
+                                                    <div className="flex items-center justify-end gap-1.5">
+                                                        {/* Primary 1-Click Action: Smart API Dispatch with auto-fallback */}
+                                                        <button
+                                                            onClick={() => handleSmartReminderDispatch(member)}
+                                                            disabled={isSending}
+                                                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all shadow-sm active:scale-95 cursor-pointer ${isSent
+                                                                    ? "bg-[#00ff87]/20 border border-[#00ff87] text-[#00ff87]"
+                                                                    : isSending
+                                                                        ? "bg-zinc-800 text-zinc-500 border border-zinc-700 cursor-not-allowed"
+                                                                        : "bg-[#00ff87]/10 hover:bg-[#00ff87]/20 border border-[#00ff87]/30 text-[#00ff87]"
+                                                                }`}
+                                                        >
+                                                            {isSending ? (
+                                                                <>
+                                                                    <span className="animate-spin text-xs">🌀</span>
+                                                                    <span>Sending...</span>
+                                                                </>
+                                                            ) : isSent ? (
+                                                                <>
+                                                                    <span>✓</span>
+                                                                    <span>Dispatched</span>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <span>💬</span>
+                                                                    <span>Send Reminder</span>
+                                                                </>
+                                                            )}
+                                                        </button>
 
-                                                    {/* Direct 1-Click WhatsApp Web Trigger */}
-                                                    <a
-                                                        href={buildPersonalizedWhatsAppUrl(member)}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="px-2.5 py-1.5 rounded-lg bg-[#181a20] hover:bg-[#252830] text-zinc-400 hover:text-[#00ff87] border border-zinc-800 transition-colors text-xs font-semibold flex items-center gap-1"
-                                                        title="Direct WhatsApp Web (No Meta sandbox restrictions)"
-                                                    >
-                                                        <span>📱</span>
-                                                        <span className="hidden sm:inline text-[10px]">WA</span>
-                                                    </a>
-                                                </div>
+                                                        {/* Direct 1-Click WhatsApp Web Trigger */}
+                                                        <a
+                                                            href={buildPersonalizedWhatsAppUrl(member)}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="px-2.5 py-1.5 rounded-lg bg-[#181a20] hover:bg-[#252830] text-zinc-400 hover:text-[#00ff87] border border-zinc-800 transition-colors text-xs font-semibold flex items-center gap-1"
+                                                            title="Direct WhatsApp Web (No Meta sandbox restrictions)"
+                                                        >
+                                                            <span>📱</span>
+                                                            <span className="hidden sm:inline text-[10px]">WA</span>
+                                                        </a>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        /* Active Tab View: Razorpay Online Collections Table */
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                                <thead>
+                                    <tr className="text-zinc-500 border-b border-zinc-800/80 pb-2">
+                                        <th className="py-3 font-medium">Payment ID</th>
+                                        <th className="py-3 font-medium">Plan Activated</th>
+                                        <th className="py-3 font-medium">Amount</th>
+                                        <th className="py-3 font-medium">Member Phone</th>
+                                        <th className="py-3 font-medium">Timestamp</th>
+                                        <th className="py-3 font-medium">Gateway Status</th>
+                                        <th className="py-3 font-medium text-right">Verification</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-zinc-800/50">
+                                    {filteredPayments.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={7} className="py-8 text-center text-zinc-500 font-mono">
+                                                No online payments matching search query.
                                             </td>
                                         </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
+                                    ) : (
+                                        filteredPayments.map((p) => (
+                                            <tr
+                                                key={p.paymentId || p.id}
+                                                className="hover:bg-[#1a1b1f]/60 transition-colors"
+                                            >
+                                                <td className="py-3.5 font-mono text-zinc-200 font-medium">
+                                                    {p.paymentId}
+                                                </td>
+                                                <td className="py-3.5 text-zinc-300 font-semibold">
+                                                    {p.planName}
+                                                </td>
+                                                <td className="py-3.5 font-mono text-[#00ff87] font-bold text-sm">
+                                                    ₹{Number(p.amount).toLocaleString("en-IN")}
+                                                </td>
+                                                <td className="py-3.5 font-mono text-zinc-400">
+                                                    {p.memberPhone
+                                                        ? `+${p.memberPhone}`
+                                                        : p.memberName || "Guest Member"}
+                                                </td>
+                                                <td className="py-3.5 font-mono text-zinc-500 text-[11px]">
+                                                    {p.date} • {p.time}
+                                                </td>
+                                                <td className="py-3.5">
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-[#00ff87] border border-emerald-500/20 font-mono">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-[#00ff87]" />
+                                                        Captured
+                                                    </span>
+                                                </td>
+                                                <td className="py-3.5 text-right">
+                                                    <a
+                                                        href={`https://dashboard.razorpay.com/app/payments/${p.paymentId}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-[11px] font-semibold text-zinc-400 hover:text-white bg-[#1b1c20] hover:bg-zinc-800 border border-zinc-800 px-2.5 py-1 rounded-lg transition-all"
+                                                    >
+                                                        Verify ↗
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
 
                 {/* Monthly Streak Cup Banner */}

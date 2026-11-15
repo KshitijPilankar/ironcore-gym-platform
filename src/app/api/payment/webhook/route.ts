@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { addPayment } from '@/lib/payment-store';
 
 export async function POST(req: Request) {
     try {
@@ -37,15 +38,30 @@ export async function POST(req: Request) {
             const amount = paymentEntity.amount / 100;
             const notes = paymentEntity.notes || {};
             const memberId = notes.memberId;
+            const planName = notes.planName || (amount >= 1900 ? 'Smart Athlete Pass' : 'Standard Gym Plan');
+            const contact = paymentEntity.contact || '';
+            const email = paymentEntity.email || '';
 
-            console.log(`[Payment Success] Member: ${memberId}, Amount: ₹${amount}, Payment ID: ${paymentId}`);
+            console.log(`[Payment Captured Webhook] ID: ${paymentId}, Amount: ₹${amount}, Member: ${memberId || contact}`);
 
-            // Yahan par status update logic execute hota hai
+            const now = new Date();
+            addPayment({
+                id: `pay_${Date.now()}`,
+                paymentId,
+                orderId: orderId || '',
+                amount,
+                planName,
+                memberPhone: contact,
+                memberName: memberId || email,
+                date: now.toISOString().split('T')[0],
+                time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                status: 'Captured',
+            });
         }
 
         return NextResponse.json({ status: 'ok' });
-    } catch (error) {
+    } catch (error: any) {
         console.error('[Webhook Error]:', error);
-        return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
+        return NextResponse.json({ error: error.message || 'Webhook processing failed' }, { status: 500 });
     }
 }
