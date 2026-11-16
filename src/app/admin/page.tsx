@@ -166,7 +166,29 @@ export default function GymAdminDashboard() {
             console.error("Failed to parse stored payments:", err);
         }
 
-        // 3. Fetch server-logged transactions and merge
+        // 3. Fetch server/Supabase synced members
+        fetch("/api/members")
+            .then((r) => r.json())
+            .then((data) => {
+                if (data?.members && Array.isArray(data.members) && data.members.length > 0) {
+                    const phoneMap = new Map<string, Member>();
+                    data.members.forEach((m: Member) => {
+                        const key = m.phone.replace(/[^0-9]/g, "").slice(-10);
+                        phoneMap.set(key, m);
+                    });
+                    initialMembers.forEach((m) => {
+                        const key = m.phone.replace(/[^0-9]/g, "").slice(-10);
+                        if (!phoneMap.has(key)) phoneMap.set(key, m);
+                    });
+                    const synced = Array.from(phoneMap.values());
+                    initialMembers = synced;
+                    setMembers(synced);
+                    localStorage.setItem("ironcore_members_db", JSON.stringify(synced));
+                }
+            })
+            .catch(() => {});
+
+        // 4. Fetch server-logged transactions and merge
         fetch("/api/payment/transactions")
             .then((r) => r.json())
             .then((data) => {
@@ -229,6 +251,13 @@ export default function GymAdminDashboard() {
         const updated = [memberToAdd, ...members];
         updateMembersState(updated);
 
+        // Sync with backend DB
+        fetch("/api/members", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(memberToAdd),
+        }).catch(() => {});
+
         setNewMember({
             name: "",
             phone: "",
@@ -264,6 +293,14 @@ export default function GymAdminDashboard() {
             m.id === editingMember.id ? editingMember : m
         );
         updateMembersState(updated);
+
+        // Sync with backend DB
+        fetch("/api/members", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(editingMember),
+        }).catch(() => {});
+
         setIsEditModalOpen(false);
         setFeedbackToast({
             type: "success",
@@ -279,6 +316,12 @@ export default function GymAdminDashboard() {
 
         const updated = members.filter((m) => m.id !== member.id);
         updateMembersState(updated);
+
+        // Sync deletion with backend DB
+        fetch(`/api/members?id=${encodeURIComponent(member.id)}`, {
+            method: "DELETE",
+        }).catch(() => {});
+
         setFeedbackToast({
             type: "success",
             text: `✓ Member "${member.name}" removed from active roster.`,

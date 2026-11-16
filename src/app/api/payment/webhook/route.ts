@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { addPayment } from '@/lib/payment-store';
+import { savePaymentToDb, saveMemberToDb } from '@/lib/db';
+import { sendWelcomeWhatsAppMessage } from '@/lib/whatsapp';
 
 export async function POST(req: Request) {
     try {
@@ -45,7 +46,9 @@ export async function POST(req: Request) {
             console.log(`[Payment Captured Webhook] ID: ${paymentId}, Amount: ₹${amount}, Member: ${memberName} (${contact})`);
 
             const now = new Date();
-            addPayment({
+            const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+            await savePaymentToDb({
                 id: `pay_${Date.now()}`,
                 paymentId,
                 orderId: orderId || '',
@@ -57,6 +60,27 @@ export async function POST(req: Request) {
                 time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 status: 'Captured',
             });
+
+            if (contact) {
+                await saveMemberToDb({
+                    id: `mem_${contact.replace(/[^0-9]/g, '')}`,
+                    name: memberName,
+                    phone: contact,
+                    plan: planName,
+                    dueDate,
+                    streakDays: 1,
+                    status: 'Paid',
+                });
+
+                // Automated WhatsApp Welcome message
+                sendWelcomeWhatsAppMessage({
+                    phone: contact,
+                    name: memberName,
+                    plan: planName,
+                    amount,
+                    dueDate,
+                }).catch(() => {});
+            }
         }
 
         return NextResponse.json({ status: 'ok' });
