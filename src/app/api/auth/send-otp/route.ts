@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { checkRateLimit, saveOtp } from "@/lib/auth-store";
+import { checkRateLimit, createOtpSignature } from "@/lib/auth-store";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
     try {
         const body = await req.json().catch(() => ({}));
         const { phone } = body;
@@ -52,9 +52,6 @@ export async function POST(req: Request) {
         // SEC-02 & SEC-07: Cryptographically secure 4-digit OTP generated strictly on server
         const secureOtp = crypto.randomInt(1000, 10000).toString();
 
-        // Store OTP with 5-minute expiry in memory store
-        saveOtp(recipientPhone, secureOtp);
-
         console.log(`[Meta Cloud API] Dispatching secure OTP to +${recipientPhone}`);
 
         // Direct WhatsApp text message inside open 24h conversation window
@@ -93,10 +90,26 @@ export async function POST(req: Request) {
             );
         }
 
-        return NextResponse.json({
+        // Stateless HMAC cookie for serverless verification across Vercel lambdas
+        const expiresAt = Date.now() + 300 * 1000; // 300 seconds (5 minutes)
+        const otpSignature = createOtpSignature(recipientPhone, secureOtp, expiresAt);
+
+        const response = NextResponse.json({
             success: true,
             messageId: data.messages?.[0]?.id,
         });
+
+        response.cookies.set({
+            name: "ironcore_otp_sig",
+            value: otpSignature,
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax",
+            path: "/",
+            maxAge: 300,
+        });
+
+        return response;
     } catch (error: any) {
         console.error("Internal Server Error in send-otp:", error);
         return NextResponse.json(
