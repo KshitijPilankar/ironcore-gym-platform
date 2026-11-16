@@ -368,28 +368,17 @@ export default function MemberPortalDashboard() {
     return (
         <div className="min-h-screen bg-[#0e0e10] text-[#f4f4f5] p-6 lg:p-10 font-sans selection:bg-[#00ff87]/30 relative">
             <div className="max-w-5xl mx-auto space-y-8">
-                {/* Top Navbar */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800/80 pb-6">
-                    <div>
-                        <span className="text-[10px] font-bold tracking-widest text-[#00ff87] uppercase">
-                            Athlete Performance Hub
-                        </span>
-                        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-0.5">
-                            Hi, <span className="text-white">{member.name}</span> 👋
-                        </h1>
-                        <p className="text-xs text-zinc-400 mt-1">
-                            Welcome back to your personalized training & nutrition dashboard.
-                        </p>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={handleSignOut}
-                            className="bg-[#1b1c20] hover:bg-red-500/10 hover:border-red-500/40 hover:text-red-400 text-zinc-400 font-semibold text-xs px-4 py-2.5 rounded-xl border border-zinc-800 transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95"
-                        >
-                            <span>🚪</span> Sign Out
-                        </button>
-                    </div>
+                {/* Page Title & Greeting */}
+                <div className="border-b border-zinc-800/80 pb-4">
+                    <span className="text-[10px] font-bold tracking-widest text-[#00ff87] uppercase font-mono">
+                        ATHLETE PERFORMANCE HUB
+                    </span>
+                    <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-0.5">
+                        Hi, <span className="text-white">{member.name}</span> 👋
+                    </h1>
+                    <p className="text-xs text-zinc-400 mt-1">
+                        Welcome back to your personalized training & nutrition dashboard.
+                    </p>
                 </div>
 
                 {/* Membership Plan & 1-Click In-Portal Renewal Action Bar */}

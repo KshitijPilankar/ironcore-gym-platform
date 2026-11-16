@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getPayments } from '@/lib/payment-store';
+import { getPaymentsFromDb } from '@/lib/db';
 
 export async function GET() {
     try {
-        const transactions = getPayments();
+        const transactions = await getPaymentsFromDb();
         return NextResponse.json({ success: true, transactions });
     } catch (err: any) {
-        console.error('[Get Payments Error]:', err);
-        return NextResponse.json({ error: err.message || 'Failed to retrieve payments' }, { status: 500 });
+        console.error('[Get Transactions Error]:', err);
+        return NextResponse.json({ error: 'Failed to fetch transactions' }, { status: 500 });
     }
 }
