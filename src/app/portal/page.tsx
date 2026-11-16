@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { currentGym } from "@/gymConfig";
+import RazorpayPaymentBtn from "@/components/RazorpayPaymentBtn";
 
 interface WeightEntry {
     date: string;
@@ -63,11 +65,25 @@ const DEFAULT_MEMBER: Member = {
 };
 
 export default function MemberPortalDashboard() {
+    const router = useRouter();
     const [member, setMember] = useState<Member>(DEFAULT_MEMBER);
     const [targetWeight, setTargetWeight] = useState<number>(70);
     const [loggedWeight, setLoggedWeight] = useState<string>("");
     const [hasCheckedInToday, setHasCheckedInToday] = useState<boolean>(false);
     const [weightLogs, setWeightLogs] = useState<WeightEntry[]>(DEFAULT_MEMBER.weightHistory || []);
+
+    const handleSignOut = async () => {
+        try {
+            await fetch("/api/auth/logout", { method: "POST" });
+        } catch (e) {
+            console.error("Logout error:", e);
+        }
+        if (typeof window !== "undefined") {
+            localStorage.removeItem("ironcore_active_member");
+            localStorage.removeItem("ironcore_member_session");
+        }
+        router.push("/login");
+    };
 
     // Chat Drawer States
     const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
@@ -362,18 +378,60 @@ export default function MemberPortalDashboard() {
                             Hi, <span className="text-white">{member.name}</span> 👋
                         </h1>
                         <p className="text-xs text-zinc-400 mt-1">
-                            Active Plan: <span className="text-zinc-200 font-semibold">{member.plan}</span> • Due Date:{" "}
-                            <span className="font-mono text-zinc-300">{member.dueDate}</span>
+                            Welcome back to your personalized training & nutrition dashboard.
                         </p>
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <Link
-                            href="/admin"
-                            className="bg-[#1b1c20] hover:bg-[#23252a] text-zinc-300 font-medium text-xs px-3.5 py-2.5 rounded-lg border border-zinc-800 transition-all flex items-center gap-1.5"
+                        <button
+                            onClick={handleSignOut}
+                            className="bg-[#1b1c20] hover:bg-red-500/10 hover:border-red-500/40 hover:text-red-400 text-zinc-400 font-semibold text-xs px-4 py-2.5 rounded-xl border border-zinc-800 transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95"
                         >
-                            ⚙️ Switch to Admin CRM
-                        </Link>
+                            <span>🚪</span> Sign Out
+                        </button>
+                    </div>
+                </div>
+
+                {/* Membership Plan & 1-Click In-Portal Renewal Action Bar */}
+                <div className="bg-[#141518] border border-zinc-800/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg">
+                    <div className="flex items-center gap-3.5">
+                        <div className="w-11 h-11 rounded-xl bg-[#00ff87]/10 border border-[#00ff87]/20 flex items-center justify-center text-xl shrink-0">
+                            🎟️
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-bold text-white uppercase tracking-wider">
+                                    {member.plan}
+                                </span>
+                                <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase ${
+                                    member.status === "Paid"
+                                        ? "bg-[#00ff87]/15 text-[#00ff87] border border-[#00ff87]/30"
+                                        : "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                                }`}>
+                                    {member.status}
+                                </span>
+                            </div>
+                            <p className="text-[11px] text-zinc-400 mt-0.5 font-mono">
+                                Renewal Due Date: <span className="text-zinc-200 font-bold">{member.dueDate}</span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <RazorpayPaymentBtn
+                            amount={member.plan.toLowerCase().includes("smart") ? 1999 : 1499}
+                            planName={member.plan}
+                            memberName={member.name}
+                            memberPhone={member.phone}
+                            buttonText="⚡ Renew / Upgrade Pass (30 Days)"
+                            className="w-full sm:w-auto bg-[#00ff87] hover:bg-[#00e57a] text-black font-extrabold text-xs px-5 py-2.5 rounded-xl transition-all shadow-md shadow-[#00ff87]/20 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                            onSuccess={() => {
+                                const next30Days = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                                const updated = { ...member, status: "Paid" as const, dueDate: next30Days };
+                                setMember(updated);
+                                localStorage.setItem("ironcore_active_member", JSON.stringify(updated));
+                            }}
+                        />
                     </div>
                 </div>
 
