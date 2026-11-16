@@ -207,6 +207,7 @@ export default function GymHomePage() {
                 planName="Standard Gym Plan"
                 buttonText="Get Started (Pay Now)"
                 memberPhone={phone}
+                memberName={name}
                 className="mt-8 w-full py-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-sm font-bold transition text-center text-white disabled:opacity-50"
               />
             </div>
@@ -236,6 +237,7 @@ export default function GymHomePage() {
                 planName="Smart Athlete Pass"
                 buttonText="Join Smart Pass (Pay Now)"
                 memberPhone={phone}
+                memberName={name}
                 className="mt-8 w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-sm font-bold transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 disabled:opacity-50"
               />
             </div>

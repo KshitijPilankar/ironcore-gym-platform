@@ -14,7 +14,7 @@ function getRazorpayClient() {
 
 export async function POST(req: Request) {
     try {
-        const { amount, memberId, planName } = await req.json();
+        const { amount, memberId, planName, memberName, memberPhone } = await req.json();
 
         // String me se comma (,) ya symbols hatakar clean number nikalna
         const parsedAmount = typeof amount === 'string'
@@ -33,6 +33,8 @@ export async function POST(req: Request) {
             receipt: `rcpt_${Date.now()}`,
             notes: {
                 memberId: memberId || 'guest_member',
+                memberName: memberName || 'Athlete Member',
+                memberPhone: memberPhone || '',
                 planName: planName || 'Gym Membership',
             },
         };

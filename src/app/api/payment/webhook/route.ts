@@ -39,10 +39,10 @@ export async function POST(req: Request) {
             const notes = paymentEntity.notes || {};
             const memberId = notes.memberId;
             const planName = notes.planName || (amount >= 1900 ? 'Smart Athlete Pass' : 'Standard Gym Plan');
-            const contact = paymentEntity.contact || '';
-            const email = paymentEntity.email || '';
+            const contact = notes.memberPhone || paymentEntity.contact || '';
+            const memberName = notes.memberName || (memberId && memberId !== 'guest_member' && memberId !== 'member_direct' ? memberId : '') || paymentEntity.email || 'Athlete Member';
 
-            console.log(`[Payment Captured Webhook] ID: ${paymentId}, Amount: ₹${amount}, Member: ${memberId || contact}`);
+            console.log(`[Payment Captured Webhook] ID: ${paymentId}, Amount: ₹${amount}, Member: ${memberName} (${contact})`);
 
             const now = new Date();
             addPayment({
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
                 amount,
                 planName,
                 memberPhone: contact,
-                memberName: memberId || email,
+                memberName,
                 date: now.toISOString().split('T')[0],
                 time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 status: 'Captured',
