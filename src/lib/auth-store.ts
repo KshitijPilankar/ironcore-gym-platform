@@ -1,23 +1,12 @@
 import crypto from "crypto";
 
-interface OtpRecord {
-    otp: string;
-    expiresAt: number;
-    attempts: number;
-}
-
-// In-memory OTP Store (5 min TTL)
-const otpStore = new Map<string, OtpRecord>();
-
 // Sliding window rate limiter: phone -> timestamps[]
 const rateLimitStore = new Map<string, number[]>();
 
 const MAX_OTP_PER_10_MIN = 5;
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
-const OTP_TTL_MS = 5 * 60 * 1000;
-const MAX_VERIFY_ATTEMPTS = 5;
 
-const SESSION_SECRET =
+export const SESSION_SECRET =
     process.env.SESSION_SECRET || "ironcore_secure_production_secret_key_98234710";
 
 /**
@@ -42,51 +31,63 @@ export function checkRateLimit(phone: string): boolean {
 }
 
 /**
- * Stores a cryptographically generated 4-digit OTP with 5 min TTL.
+ * Creates a stateless HMAC-SHA256 signature for serverless OTP verification.
+ * Format: `${expiresAt}.${hmac}`
  */
-export function saveOtp(phone: string, otp: string): void {
-    otpStore.set(phone, {
-        otp,
-        expiresAt: Date.now() + OTP_TTL_MS,
-        attempts: 0,
-    });
+export function createOtpSignature(phone: string, otp: string, expiresAt: number): string {
+    const hmac = crypto
+        .createHmac("sha256", SESSION_SECRET)
+        .update(`${phone}:${otp}:${expiresAt}`)
+        .digest("hex");
+    return `${expiresAt}.${hmac}`;
 }
 
 /**
- * Verifies submitted OTP against stored OTP using constant-time comparison.
+ * Verifies the stateless OTP signature cookie using constant-time comparison.
  */
-export function verifyOtp(phone: string, inputOtp: string): { valid: boolean; error?: string } {
-    const record = otpStore.get(phone);
-
-    if (!record) {
+export function verifyOtpSignature(
+    phone: string,
+    otp: string,
+    signatureCookie: string
+): { valid: boolean; error?: string } {
+    if (!signatureCookie || !signatureCookie.includes(".")) {
         return { valid: false, error: "OTP expired ya generate nahi hua. Kripya naya code mangwayein." };
     }
 
-    if (Date.now() > record.expiresAt) {
-        otpStore.delete(phone);
+    const [expiresAtStr, sig] = signatureCookie.split(".");
+    const expiresAt = parseInt(expiresAtStr, 10);
+
+    if (isNaN(expiresAt) || !sig) {
+        return { valid: false, error: "Invalid OTP session signature. Kripya naya code request karein." };
+    }
+
+    if (Date.now() > expiresAt) {
         return { valid: false, error: "OTP ki valid time (5 minutes) khatam ho chuki hai. Naya OTP lein." };
     }
 
-    record.attempts += 1;
-    if (record.attempts > MAX_VERIFY_ATTEMPTS) {
-        otpStore.delete(phone);
-        return { valid: false, error: "Maximum attempts cross ho gaye. Kripya naya code request karein." };
-    }
+    const clean = phone.replace(/[^0-9]/g, "");
+    const rawTen = clean.length > 10 ? clean.slice(-10) : clean;
+    const withCountry = `91${rawTen}`;
 
-    // Timing-safe constant time comparison to defeat timing attacks
-    const a = Buffer.from(record.otp);
-    const b = Buffer.from(inputOtp.padEnd(record.otp.length, " "));
+    // Test candidate phone formats in case phone was normalized with or without 91 prefix
+    const candidatePhones = Array.from(new Set([phone, clean, withCountry, rawTen]));
+    const sigBuf = Buffer.from(sig);
 
-    const isMatch = a.length === b.length && crypto.timingSafeEqual(a, b);
+    for (const candidate of candidatePhones) {
+        const expectedHmac = crypto
+            .createHmac("sha256", SESSION_SECRET)
+            .update(`${candidate}:${otp}:${expiresAt}`)
+            .digest("hex");
 
-    if (isMatch) {
-        otpStore.delete(phone);
-        return { valid: true };
+        const expectedBuf = Buffer.from(expectedHmac);
+        if (sigBuf.length === expectedBuf.length && crypto.timingSafeEqual(sigBuf, expectedBuf)) {
+            return { valid: true };
+        }
     }
 
     return {
         valid: false,
-        error: `Galat OTP! Kripya WhatsApp par aaya hua 4-digit code enter karein. (${MAX_VERIFY_ATTEMPTS - record.attempts} attempts bache hain)`,
+        error: "Galat OTP! Kripya WhatsApp par aaya hua 4-digit code enter karein.",
     };
 }
 
@@ -137,4 +138,3 @@ export function verifySignedToken(token: string): { valid: boolean; payload?: an
         return { valid: false };
     }
 }
-
