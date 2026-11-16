@@ -71,6 +71,21 @@ export default function MemberPortalDashboard() {
     const [loggedWeight, setLoggedWeight] = useState<string>("");
     const [hasCheckedInToday, setHasCheckedInToday] = useState<boolean>(false);
     const [weightLogs, setWeightLogs] = useState<WeightEntry[]>(DEFAULT_MEMBER.weightHistory || []);
+    const [leaderboard, setLeaderboard] = useState<Member[]>([]);
+    const [isMounted, setIsMounted] = useState<boolean>(false);
+
+    const calculateDaysLeft = (dueDateStr: string): number => {
+        try {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const due = new Date(dueDateStr);
+            due.setHours(0, 0, 0, 0);
+            const diffTime = due.getTime() - today.getTime();
+            return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        } catch {
+            return 0;
+        }
+    };
 
     const handleSignOut = async () => {
         try {
@@ -188,12 +203,44 @@ export default function MemberPortalDashboard() {
             } else {
                 initDefaultChat(memberName);
             }
+            // Load dynamic leaderboard from members database
+            if (typeof window !== "undefined") {
+                const storedRoster = localStorage.getItem("ironcore_members_db");
+                if (storedRoster) {
+                    try {
+                        const parsedList: Member[] = JSON.parse(storedRoster);
+                        if (Array.isArray(parsedList) && parsedList.length > 0) {
+                            const sorted = [...parsedList]
+                                .sort((a, b) => (b.streakDays || 0) - (a.streakDays || 0))
+                                .slice(0, 3);
+                            setLeaderboard(sorted);
+                        }
+                    } catch {
+                        // ignore
+                    }
+                }
+            }
+
+            // Also fetch fresh from /api/members for cross-device sync
+            fetch("/api/members")
+                .then((r) => r.json())
+                .then((data) => {
+                    if (data?.members && Array.isArray(data.members) && data.members.length > 0) {
+                        const sorted = [...data.members]
+                            .sort((a: any, b: any) => (b.streakDays || 0) - (a.streakDays || 0))
+                            .slice(0, 3);
+                        setLeaderboard(sorted);
+                    }
+                })
+                .catch(() => {});
         } catch (criticalErr) {
             console.error("Error hydrating athlete portal dashboard:", criticalErr);
             setMember(DEFAULT_MEMBER);
             setTargetWeight(70);
             setWeightLogs(DEFAULT_MEMBER.weightHistory || []);
             initDefaultChat(DEFAULT_MEMBER.name);
+        } finally {
+            setIsMounted(true);
         }
     }, []);
 
@@ -365,6 +412,8 @@ export default function MemberPortalDashboard() {
     const latestWeight = weightLogs.length > 0 ? weightLogs[0].weightKg : 72;
     const weightDifference = (latestWeight - targetWeight).toFixed(1);
 
+    if (!isMounted) return null;
+
     return (
         <div className="min-h-screen bg-[#0e0e10] text-[#f4f4f5] p-6 lg:p-10 font-sans selection:bg-[#00ff87]/30 relative">
             <div className="max-w-5xl mx-auto space-y-8">
@@ -399,6 +448,34 @@ export default function MemberPortalDashboard() {
                                 }`}>
                                     {member.status}
                                 </span>
+                                {(() => {
+                                    const days = calculateDaysLeft(member.dueDate);
+                                    if (days < 0) {
+                                        return (
+                                            <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase bg-red-500/15 text-red-400 border border-red-500/30">
+                                                Overdue ({Math.abs(days)}d)
+                                            </span>
+                                        );
+                                    } else if (days === 0) {
+                                        return (
+                                            <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase bg-amber-500/15 text-amber-400 border border-amber-500/30 animate-pulse">
+                                                Expires Today
+                                            </span>
+                                        );
+                                    } else if (days <= 7) {
+                                        return (
+                                            <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                                                Expires in {days} Days
+                                            </span>
+                                        );
+                                    } else {
+                                        return (
+                                            <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase bg-[#00ff87]/15 text-[#00ff87] border border-[#00ff87]/30">
+                                                {days} Days Left
+                                            </span>
+                                        );
+                                    }
+                                })()}
                             </div>
                             <p className="text-[11px] text-zinc-400 mt-0.5 font-mono">
                                 Renewal Due Date: <span className="text-zinc-200 font-bold">{member.dueDate}</span>
@@ -451,6 +528,65 @@ export default function MemberPortalDashboard() {
                             <span>{hasCheckedInToday ? "✓" : "⚡"}</span>
                             <span>{hasCheckedInToday ? "Checked In Today" : "Check In At Gym"}</span>
                         </button>
+                    </div>
+                </div>
+
+                {/* Dynamic Gym Streak Leaderboard */}
+                <div className="bg-[#141518] border border-zinc-800/80 rounded-2xl p-5 sm:p-6 space-y-4 shadow-lg">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800/80 pb-3">
+                        <div className="flex items-center gap-2">
+                            <span className="text-lg">🏆</span>
+                            <div>
+                                <h3 className="text-sm font-bold text-white">Monthly Streak Cup Leaderboard</h3>
+                                <p className="text-[11px] text-zinc-400">Live rankings of the top 3 most consistent IronCore athletes</p>
+                            </div>
+                        </div>
+                        <div className="self-start sm:self-auto bg-[#1b1c20] border border-zinc-800 text-zinc-300 text-[10px] font-semibold px-3 py-1 rounded-full font-mono">
+                            Prize: 1x Isolate Whey Tub 🥛
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {(leaderboard.length > 0 ? leaderboard : [
+                            { id: "1", name: "Sneha Patel", streakDays: 31, plan: "Standard Gym" },
+                            { id: "2", name: "Aman Sharma", streakDays: 24, plan: "Smart Fitness" },
+                            { id: "3", name: "Sachin Pilankar", streakDays: 18, plan: "Standard Gym" }
+                        ] as Member[]).slice(0, 3).map((topAthlete, idx) => {
+                            const medalEmoji = idx === 0 ? "🥇" : idx === 1 ? "🥈" : "🥉";
+                            const rankColor = idx === 0 ? "text-[#00ff87]" : idx === 1 ? "text-zinc-300" : "text-amber-500";
+                            const isMe = topAthlete.name.toLowerCase() === member.name.toLowerCase();
+
+                            return (
+                                <div
+                                    key={topAthlete.id || idx}
+                                    className={`bg-[#1b1c20] border rounded-xl p-3.5 flex items-center justify-between transition-all ${
+                                        isMe ? "border-[#00ff87]/50 shadow-md shadow-[#00ff87]/10" : "border-zinc-800/80"
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-2.5">
+                                        <span className="text-base">{medalEmoji}</span>
+                                        <div>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className={`text-[10px] font-bold uppercase tracking-wider font-mono ${rankColor}`}>
+                                                    Rank #{idx + 1}
+                                                </span>
+                                                {isMe && (
+                                                    <span className="bg-[#00ff87]/20 text-[#00ff87] text-[9px] font-bold px-1.5 py-0.2 rounded">
+                                                        YOU
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <span className="text-xs font-semibold text-zinc-100 block truncate max-w-[120px]">
+                                                {topAthlete.name}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <span className="text-xs font-bold text-amber-400 font-mono flex items-center gap-1">
+                                        🔥 {topAthlete.streakDays || 0}d
+                                    </span>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
 

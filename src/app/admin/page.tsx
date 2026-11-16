@@ -125,6 +125,8 @@ export default function GymAdminDashboard() {
         actionUrl?: string;
     } | null>(null);
     const [isMounted, setIsMounted] = useState(false);
+    const [isBulkSending, setIsBulkSending] = useState(false);
+    const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
 
     // Form State
     const [newMember, setNewMember] = useState({
@@ -513,6 +515,151 @@ export default function GymAdminDashboard() {
         }
     };
 
+    const calculateDaysLeft = (dueDateStr: string): number => {
+        try {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const due = new Date(dueDateStr);
+            due.setHours(0, 0, 0, 0);
+            const diffTime = due.getTime() - today.getTime();
+            return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        } catch {
+            return 0;
+        }
+    };
+
+    const handleBulkRemindAllDue = async () => {
+        const targets = members.filter((m) => m.status === "Due" || m.status === "Overdue");
+        if (targets.length === 0) {
+            alert("No members are currently due or overdue!");
+            return;
+        }
+
+        const confirmed = window.confirm(
+            `Are you sure you want to send WhatsApp renewal reminders to all ${targets.length} due/overdue athletes?`
+        );
+        if (!confirmed) return;
+
+        setIsBulkSending(true);
+        setBulkProgress({ current: 0, total: targets.length });
+
+        let successCount = 0;
+        let fallbackCount = 0;
+
+        for (let i = 0; i < targets.length; i++) {
+            const target = targets[i];
+            setBulkProgress({ current: i + 1, total: targets.length });
+
+            try {
+                const res = await fetch("/api/whatsapp/send-reminder", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        name: target.name,
+                        phone: target.phone,
+                        plan: target.plan,
+                        dueDate: target.dueDate,
+                        streakDays: target.streakDays,
+                        amount: target.plan === "Smart Pass" ? "1,999" : "1,499",
+                    }),
+                });
+
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    successCount++;
+                } else {
+                    fallbackCount++;
+                    if (i === 0) {
+                        window.open(buildPersonalizedWhatsAppUrl(target), "_blank");
+                    }
+                }
+            } catch {
+                fallbackCount++;
+                if (i === 0) {
+                    window.open(buildPersonalizedWhatsAppUrl(target), "_blank");
+                }
+            }
+
+            // Small delay between calls to avoid hitting rate limits
+            await new Promise((resolve) => setTimeout(resolve, 600));
+        }
+
+        setIsBulkSending(false);
+        setBulkProgress(null);
+
+        setFeedbackToast({
+            type: successCount > 0 ? "success" : "warning",
+            text: `✓ Bulk dispatch complete: ${successCount} delivered via Meta Cloud API${fallbackCount > 0 ? `, ${fallbackCount} fallback via WhatsApp Web` : ""}.`,
+        });
+    };
+
+    const handleExportRosterCSV = () => {
+        if (members.length === 0) {
+            alert("No member data to export!");
+            return;
+        }
+
+        const headers = ["ID", "Name", "Phone", "Plan", "Due Date", "Days Left", "Streak (Days)", "Status"];
+        const rows = members.map((m) => {
+            const daysLeft = calculateDaysLeft(m.dueDate);
+            return [
+                `"${m.id}"`,
+                `"${(m.name || "").replace(/"/g, '""')}"`,
+                `"'+${m.phone}"`,
+                `"${(m.plan || "").replace(/"/g, '""')}"`,
+                `"${m.dueDate || ""}"`,
+                `"${daysLeft}"`,
+                `"${m.streakDays || 0}"`,
+                `"${m.status || ""}"`,
+            ];
+        });
+
+        const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\r\n");
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `ironcore_members_roster_${new Date().toISOString().split("T")[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
+    const handleExportRevenueCSV = () => {
+        if (payments.length === 0) {
+            alert("No payment transactions to export!");
+            return;
+        }
+
+        const headers = ["ID", "Payment ID", "Order ID", "Member Name", "Member Phone", "Plan Name", "Amount (INR)", "Date", "Time", "Status"];
+        const rows = payments.map((p) => {
+            return [
+                `"${p.id || ""}"`,
+                `"${p.paymentId || ""}"`,
+                `"${p.orderId || ""}"`,
+                `"${(p.memberName || "").replace(/"/g, '""')}"`,
+                `"'+${p.memberPhone || ""}"`,
+                `"${(p.planName || "").replace(/"/g, '""')}"`,
+                `"${p.amount || 0}"`,
+                `"${p.date || ""}"`,
+                `"${p.time || ""}"`,
+                `"${p.status || ""}"`,
+            ];
+        });
+
+        const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\r\n");
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `ironcore_revenue_transactions_${new Date().toISOString().split("T")[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
     const filteredMembers = members.filter(
         (m) =>
             m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -679,9 +826,9 @@ export default function GymAdminDashboard() {
 
                 {/* Operations & Revenue Table Container */}
                 <div className="bg-[#141518] border border-zinc-800/80 rounded-xl p-5 sm:p-6 shadow-sm space-y-4">
-                    {/* View Mode Tabs & Search Bar */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800/80 pb-3">
-                        <div className="flex items-center gap-2">
+                    {/* View Mode Tabs, Bulk Dispatch & CSV Export Controls */}
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-zinc-800/80 pb-3">
+                        <div className="flex items-center gap-2 flex-wrap">
                             <button
                                 onClick={() => setActiveTab("members")}
                                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
@@ -705,22 +852,74 @@ export default function GymAdminDashboard() {
                             </button>
                         </div>
 
-                        {/* Search Input */}
-                        <div className="relative w-full sm:w-64">
-                            <span className="absolute left-3 top-2.5 text-zinc-500 text-xs">
-                                🔍
-                            </span>
-                            <input
-                                type="text"
-                                placeholder={
-                                    activeTab === "members"
-                                        ? "Search member name or phone..."
-                                        : "Search payment ID, phone, plan..."
-                                }
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full bg-[#1b1c20] border border-zinc-800/90 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#00ff87]/60"
-                            />
+                        {/* Action buttons & Search bar */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {activeTab === "members" && (
+                                <>
+                                    {/* Bulk Remind All Due */}
+                                    <button
+                                        onClick={handleBulkRemindAllDue}
+                                        disabled={isBulkSending || members.filter((m) => m.status === "Due" || m.status === "Overdue").length === 0}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm ${
+                                            isBulkSending
+                                                ? "bg-zinc-800 text-zinc-500 border border-zinc-700 cursor-not-allowed"
+                                                : "bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 cursor-pointer active:scale-95"
+                                        }`}
+                                        title="Send WhatsApp renewal reminders to all due or overdue members"
+                                    >
+                                        {isBulkSending ? (
+                                            <>
+                                                <span className="animate-spin text-xs">🌀</span>
+                                                <span>Reminding ({bulkProgress?.current}/{bulkProgress?.total})...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span>⚡</span>
+                                                <span>Remind All Due ({members.filter((m) => m.status === "Due" || m.status === "Overdue").length})</span>
+                                            </>
+                                        )}
+                                    </button>
+
+                                    {/* Export Roster CSV */}
+                                    <button
+                                        onClick={handleExportRosterCSV}
+                                        className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#1b1c20] hover:bg-[#252830] text-zinc-300 hover:text-white border border-zinc-800 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
+                                        title="Download Members Roster as CSV spreadsheet"
+                                    >
+                                        <span>📄</span>
+                                        <span>Export Roster CSV</span>
+                                    </button>
+                                </>
+                            )}
+
+                            {activeTab === "payments" && (
+                                <button
+                                    onClick={handleExportRevenueCSV}
+                                    className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#1b1c20] hover:bg-[#252830] text-[#00ff87] border border-[#00ff87]/30 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
+                                    title="Download Payment Collections as CSV spreadsheet"
+                                >
+                                    <span>📊</span>
+                                    <span>Export Revenue CSV</span>
+                                </button>
+                            )}
+
+                            {/* Search Input */}
+                            <div className="relative w-full sm:w-56">
+                                <span className="absolute left-3 top-2 text-zinc-500 text-xs">
+                                    🔍
+                                </span>
+                                <input
+                                    type="text"
+                                    placeholder={
+                                        activeTab === "members"
+                                            ? "Search member name..."
+                                            : "Search payment..."
+                                    }
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full bg-[#1b1c20] border border-zinc-800/90 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#00ff87]/60"
+                                />
+                            </div>
                         </div>
                     </div>
 
@@ -756,7 +955,35 @@ export default function GymAdminDashboard() {
                                                 </td>
                                                 <td className="py-3.5 text-zinc-400 font-mono">{member.plan}</td>
                                                 <td className="py-3.5 text-zinc-400 font-mono">
-                                                    {member.dueDate}
+                                                    <div>{member.dueDate}</div>
+                                                    {(() => {
+                                                        const days = calculateDaysLeft(member.dueDate);
+                                                        if (days < 0) {
+                                                            return (
+                                                                <span className="text-[9px] px-1.5 py-0.2 rounded font-mono font-bold uppercase bg-red-500/15 text-red-400 border border-red-500/30">
+                                                                    Overdue ({Math.abs(days)}d)
+                                                                </span>
+                                                            );
+                                                        } else if (days === 0) {
+                                                            return (
+                                                                <span className="text-[9px] px-1.5 py-0.2 rounded font-mono font-bold uppercase bg-amber-500/15 text-amber-400 border border-amber-500/30 animate-pulse">
+                                                                    Expires Today
+                                                                </span>
+                                                            );
+                                                        } else if (days <= 7) {
+                                                            return (
+                                                                <span className="text-[9px] px-1.5 py-0.2 rounded font-mono font-bold uppercase bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                                                                    {days}d Left
+                                                                </span>
+                                                            );
+                                                        } else {
+                                                            return (
+                                                                <span className="text-[9px] px-1.5 py-0.2 rounded font-mono font-bold uppercase bg-[#00ff87]/15 text-[#00ff87] border border-[#00ff87]/30">
+                                                                    {days}d Left
+                                                                </span>
+                                                            );
+                                                        }
+                                                    })()}
                                                 </td>
                                                 <td className="py-3.5">
                                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono">
@@ -943,41 +1170,38 @@ export default function GymAdminDashboard() {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                        <div className="bg-[#1b1c20] border border-zinc-800/80 rounded-lg p-3.5 flex items-center justify-between">
-                            <div>
-                                <span className="text-[10px] font-bold text-[#00ff87] uppercase tracking-wider block">
-                                    Rank #1
-                                </span>
-                                <span className="text-xs font-semibold text-zinc-200 mt-0.5 block">
-                                    Sneha Patel
-                                </span>
-                            </div>
-                            <span className="text-xs font-bold text-amber-400 font-mono">🔥 31d</span>
-                        </div>
-
-                        <div className="bg-[#1b1c20] border border-zinc-800/80 rounded-lg p-3.5 flex items-center justify-between">
-                            <div>
-                                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
-                                    Rank #2
-                                </span>
-                                <span className="text-xs font-semibold text-zinc-200 mt-0.5 block">
-                                    Aman Sharma
-                                </span>
-                            </div>
-                            <span className="text-xs font-bold text-amber-400 font-mono">🔥 24d</span>
-                        </div>
-
-                        <div className="bg-[#1b1c20] border border-zinc-800/80 rounded-lg p-3.5 flex items-center justify-between">
-                            <div>
-                                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
-                                    Rank #3
-                                </span>
-                                <span className="text-xs font-semibold text-zinc-200 mt-0.5 block">
-                                    Sachin Pilankar
-                                </span>
-                            </div>
-                            <span className="text-xs font-bold text-amber-400 font-mono">🔥 18d</span>
-                        </div>
+                        {members
+                            .slice()
+                            .sort((a, b) => (b.streakDays || 0) - (a.streakDays || 0))
+                            .slice(0, 3)
+                            .map((topMember, idx) => {
+                                const medalEmoji = idx === 0 ? "🥇" : idx === 1 ? "🥈" : "🥉";
+                                const rankColor = idx === 0 ? "text-[#00ff87]" : idx === 1 ? "text-zinc-300" : "text-amber-500";
+                                return (
+                                    <div
+                                        key={topMember.id || idx}
+                                        className="bg-[#1b1c20] border border-zinc-800/80 rounded-lg p-3.5 flex items-center justify-between"
+                                    >
+                                        <div className="flex items-center gap-2.5">
+                                            <span className="text-base">{medalEmoji}</span>
+                                            <div>
+                                                <span className={`text-[10px] font-bold ${rankColor} uppercase tracking-wider block font-mono`}>
+                                                    Rank #{idx + 1}
+                                                </span>
+                                                <span className="text-xs font-semibold text-zinc-200 mt-0.5 block truncate max-w-[130px]">
+                                                    {topMember.name}
+                                                </span>
+                                                <span className="text-[10px] text-zinc-500 font-mono">
+                                                    +{topMember.phone}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <span className="text-xs font-bold text-amber-400 font-mono">
+                                            🔥 {topMember.streakDays || 0}d
+                                        </span>
+                                    </div>
+                                );
+                            })}
                     </div>
                 </div>
             </div>
